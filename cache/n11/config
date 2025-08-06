@@ -1,0 +1,29 @@
+model:
+  src_vocab_size: 4
+  tgt_vocab_size: 4
+  tgt_vocab_size: 4
+  d_model: 128
+  num_heads: 4
+  d_ff: 256
+  num_encoder_layers: 1
+  num_decoder_layers: 1
+  max_len: 128
+  dropout: 0
+  architecture: 'encoder_decoder'
+  is_sinusoidal: false
+
+training:
+  batch_size: 32
+  num_epochs: 100
+  learning_rate: 0.0001
+  weight_decay: 0
+  cache_dir: 'cache'  # Directory to store training logs and models
+
+data:
+  eval_size: 10000                                  # maximum number of evaluation samples
+  n: 11                                             # Dyck words semilength
+  data_path: 'data/dyck_data_11.pkl'
+  force_regenerate: false                           # Set to true to force data regeneration
+
+device:
+  use_cuda: true

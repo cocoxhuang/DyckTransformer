@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import math
 
 class PositionalEncoding(nn.Module):
@@ -236,3 +237,176 @@ class Transformer(nn.Module):
             tgt = torch.cat((tgt, next_token), dim=1)
         
         return tgt
+
+    def generate(self, src, tgt, max_new_tokens, temperature=1.0, top_k=None):
+        if self.architecture == 'encoder_only':
+            raise ValueError("Generation is not supported for encoder-only models")
+        assert tgt is not None, "Target sequence must be provided for generation"
+            
+        for _ in range(max_new_tokens):
+            # Forward pass
+            if self.architecture == 'decoder_only':
+                logits = self(tgt=tgt)
+            else:
+                logits = self(src=src, tgt=tgt)
+            
+            # Focus on last time step
+            logits = logits[:, -1, :] / temperature
+            
+            # Optionally crop to top-k
+            if top_k is not None:
+                v, _ = torch.topk(logits, min(top_k, logits.size(-1)))
+                logits[logits < v[:, [-1]]] = -float('Inf')
+            
+            # Apply softmax for probabilities
+            probs = F.softmax(logits, dim=-1)
+            
+            # Sample from distribution
+            next_token = torch.multinomial(probs, num_samples=1)
+            
+            # Append to sequence
+            tgt = torch.cat((tgt, next_token), dim=1)
+        
+        return tgt
+    
+    def _embedding_weights(self):
+        # returns embedding weights for visualization or analysis
+        return {
+            'src_embedding': self.src_embedding.weight if hasattr(self, 'src_embedding') else None,
+            'tgt_embedding': self.tgt_embedding.weight if hasattr(self, 'tgt_embedding') else None
+        }
+
+    def _attention_scores(self):
+        # first do a pass
+        # self.forward(src=src, tgt=tgt, src_mask=src_mask, tgt_mask=tgt_mask)
+
+        # returns attention scores for a specific pass for visualization or analysis
+        attention_scores = {}
+        
+        # Collect encoder attention scores
+        if self.architecture != 'decoder_only' and hasattr(self, 'encoder'):
+            attention_scores['encoder'] = []
+            for i, layer in enumerate(self.encoder):
+                if hasattr(layer.self_attn, 'last_attn_scores') and layer.self_attn.last_attn_scores is not None:
+                    attention_scores['encoder'].append({
+                        'layer':  i,
+                        'self_attention': layer.self_attn.last_attn_scores.clone()
+                    })
+        
+        # Collect decoder attention scores
+        if self.architecture != 'encoder_only' and hasattr(self, 'decoder'):
+            attention_scores['decoder'] = []
+            for i, layer in enumerate(self.decoder):
+                layer_scores = {'layer': i}
+                
+                # Self-attention scores
+                if hasattr(layer.self_attn, 'last_attn_scores') and layer.self_attn.last_attn_scores is not None:
+                    layer_scores['self_attention'] = layer.self_attn.last_attn_scores.clone()
+                
+                # Cross-attention scores (for encoder-decoder architecture)
+                if hasattr(layer, 'cross_attn') and hasattr(layer.cross_attn, 'last_attn_scores') and layer.cross_attn.last_attn_scores is not None:
+                    layer_scores['cross_attention'] = layer.cross_attn.last_attn_scores.clone()
+                
+                attention_scores['decoder'].append(layer_scores)
+        
+        return attention_scores
+
+    def generate_with_attention_tracking(self, src=None, tgt=None, max_new_tokens=10, temperature=1.0, top_k=None):
+        """
+        Generate tokens while tracking attention scores at each step.
+        
+        Args:
+            src: Source sequence (for encoder-decoder models)
+            tgt: Initial target sequence 
+            max_new_tokens: Number of new tokens to generate
+            temperature: Temperature for sampling
+            top_k: Top-k sampling parameter
+            
+        Returns:
+            dict containing:
+                generated_tokens: The generated sequence
+                attention_history: List of attention scores at each generation step
+        """
+        if self.architecture == 'encoder_only':
+            raise ValueError("Generation is not supported for encoder-only models")
+        assert tgt is not None, "Target sequence must be provided for generation"
+
+        # Store all attention patterns throughout generation
+        attention_history = []
+        generated_tokens = tgt.clone()
+        
+        # If encoder-decoder, encode source once
+        encoder_output = None
+        if self.architecture == 'encoder_decoder' and src is not None:
+            # Encode source sequence
+            src_emb = self.src_embedding(src)
+            src_emb = self.src_pos_encoding(src_emb)
+            for layer in self.encoder:
+                src_emb = layer(src_emb)
+            encoder_output = src_emb
+            
+        for step in range(max_new_tokens):
+            # # Clear previous attention scores
+            # self._clear_attention_scores()
+            
+            # # Forward pass with current sequence
+            if self.architecture == 'decoder_only':
+                logits = self(tgt=generated_tokens)
+            else:
+                logits = self(src=src, tgt=generated_tokens)
+            
+            # Collect attention scores for this step
+            step_attention = self._attention_scores()
+                
+            step_attention['generation_step'] = step
+            step_attention['sequence_length'] = generated_tokens.size(1)
+            attention_history.append(step_attention)
+            
+            # Focus on last time step for next token prediction
+            logits = logits[:, -1, :] / temperature
+            
+            # Optionally crop to top-k
+            if top_k is not None:
+                v, _ = torch.topk(logits, min(top_k, logits.size(-1)))
+                logits[logits < v[:, [-1]]] = -float('Inf')
+            
+            # Apply softmax for probabilities
+            probs = F.softmax(logits, dim=-1)
+            
+            # Sample from distribution
+            next_token = torch.multinomial(probs, num_samples=1)
+            
+            # Append to sequence
+            generated_tokens = torch.cat((generated_tokens, next_token), dim=1)
+        
+        return {
+            'generated_tokens': generated_tokens,
+            'attention_history': attention_history
+        }
+    
+    def _clear_attention_scores(self):
+        """Clear stored attention scores from all layers."""
+        # Clear encoder attention scores
+        if self.architecture != 'decoder_only' and hasattr(self, 'encoder'):
+            for layer in self.encoder:
+                if hasattr(layer.self_attn, 'last_attn_scores'):
+                    layer.self_attn.last_attn_scores = None
+        
+        # Clear decoder attention scores
+        if self.architecture != 'encoder_only' and hasattr(self, 'decoder'):
+            for layer in self.decoder:
+                if hasattr(layer.self_attn, 'last_attn_scores'):
+                    layer.self_attn.last_attn_scores = None
+                if hasattr(layer, 'cross_attn') and hasattr(layer.cross_attn, 'last_attn_scores'):
+                    layer.cross_attn.last_attn_scores = None
+
+    def _encoder_embeddings(self,src,src_mask=None):
+        # returns encoder embeddings for a specific pass for visualization or analysis
+        if self.architecture == 'decoder_only':
+            return None
+        else:
+            src_emb = self.src_embedding(src)
+            src_emb = self.src_pos_encoding(src_emb)
+            for layer in self.encoder:
+                src_emb = layer(src_emb, src_mask=src_mask)
+            return src_emb

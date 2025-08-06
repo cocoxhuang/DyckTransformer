@@ -1,3 +1,6 @@
+import torch
+import torch.nn.functional as F
+
 class Evaluator:
     def __init__(self, model, dataloader, criterion, device):
         self.model = model

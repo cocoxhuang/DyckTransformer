@@ -1,0 +1,8 @@
+# Cache and session directories
+cache/n11_dropout_0_1_sesh
+
+# Python bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+*.so

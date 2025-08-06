@@ -1,26 +1,44 @@
 from copy import deepcopy
 import torch
+from ..utils.config import load_config
+import numpy as np
+import random
+import os
 
 class Dataset:
-    def __init__(self, data, batch_size=32):
+    def __init__(self, data, seed = 42, batch_size=32):
         self.data = {
             'inputs': data['inputs'].clone(),
             'targets': data['targets'].clone()
         }
         self.bos_index = 0  # Beginning of sequence token index
         self.eos_index = 1  # End of sequence token index
-        self.dictionary = self.__dict__()
         self.batch_size = batch_size
         self.train_dataloader, self.eval_dataloader = self.create_train_val_dataloader()
-
-    def __dict__(self):
-        dict = {
+        # Move dictionary creation to AFTER data transformation
+        self.dictionary = self._create_dictionary()
+        torch.manual_seed(seed)
+        np.random.seed(seed)
+        random.seed(seed)
+        os.environ["PYTHONHASHSEED"] = str(seed)
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
+        
+    def _create_dictionary(self):
+        vocab_dict = {
             self.bos_index: 'bos',
             self.eos_index: 'eos'
         }
-        for i in range(max(self.data['inputs'].max(), self.data['targets'].max())):
-            dict[i] = f'token_{i}'
-        return dict
+        
+        # Now use the transformed data's max value
+        max_token_id = max(self.data['inputs'].max().item(), self.data['targets'].max().item())
+        
+        # Map the actual token IDs that exist in the transformed data
+        for token_id in range(2, max_token_id + 1):  # Start from 2 since 0,1 are BOS/EOS
+            original_value = token_id - 2            # Reverse the +2 shift to get original value
+            vocab_dict[token_id] = original_value
+            
+        return vocab_dict
 
     def create_dataloader(self, data):
         dataset = torch.utils.data.TensorDataset(data['inputs'], data['targets'])
