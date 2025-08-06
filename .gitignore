@@ -1,6 +1,6 @@
 # Cache and session directories
 cache/n11_dropout_0_1_sesh
-data
+data/
 
 # Python bytecode
 __pycache__/
