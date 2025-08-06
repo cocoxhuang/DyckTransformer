@@ -2,14 +2,38 @@
 
 A PyTorch implementation of a Transformer model for learning Dyck language patterns. This project focuses on training encoder-decoder transformers to understand and generate balanced parentheses sequences (Dyck words) with comprehensive attention mechanism analysis and robust training infrastructure.
 
-## Features
+## Usage
 
 - **Transformer Architecture**: Supports encoder-only, decoder-only, and encoder-decoder configurations
-- **Dyck Language Generation**: Automated generation of balanced parentheses sequences using SageMath
-- **Attention Visualization**: Interactive analysis tools for cross-attention and self-attention patterns
-- **Jupyter Notebook Analysis**: Ready-to-use notebooks for model analysis and visualization
+- **Jupyter Notebook Analysis**: For cross attention and self attention analysis and visualization
 
-## 📁 Project Structure
+## Quick Start
+
+### Basic Training
+Start a new training session:
+```bash
+python train.py
+```
+
+With custom configuration:
+```bash
+python train.py --config configs/custom_config.yaml
+```
+
+### Training Resumption
+Resume training from a previous session:
+```bash
+python train.py --resume cache/sesh_20250806_123456
+```
+
+### Data Generation
+Generate Dyck word datasets for a choice of semi-length n, saved to data/dyck_data_n.pkl
+```bash
+# Example usage
+python dyck_data.py --n 11
+```
+
+## Project Structure
 
 ```
 DyckTransformer/
@@ -31,11 +55,10 @@ DyckTransformer/
 │   └── default_config.yaml         # YAML configuration file
 ├── cache/                           # Cached data and model checkpoints
 │   └── sesh_YYYYMMDD_HHMMSS/       # Timestamped training sessions
-├── examples/
-│   └── resume_training.py          # Example scripts for training resumption
-├── Analysis.ipynb        # Analysis notebook with attention visualization
+├── data/                            # Generated Dyck datasets
+├── Analysis.ipynb                   # Analysis notebook with attention visualization
 ├── train.py                        # Main training script with resume support
-├── manage_sessions.py              # Session management utility
+├── dyck_data.py                    # Utility for generating multiple Dyck datasets
 ├── requirements.txt                # Python dependencies
 ├── .gitignore                      # Git ignore patterns
 └── README.md
@@ -70,59 +93,6 @@ brew install sagemath
 
 # Or use conda
 conda install -c conda-forge sage
-```
-
-## Quick Start
-
-## Quick Start
-
-### Basic Training
-Start a new training session:
-```bash
-python train.py
-```
-
-With custom configuration:
-```bash
-python train.py --config configs/custom_config.yaml
-```
-
-### Training Resumption
-Resume training from a previous session:
-```bash
-python train.py --resume cache/sesh_20250806_123456
-```
-
-## Configuration
-
-The project uses YAML configuration files for easy parameter management. Key configuration sections:
-
-```yaml
-# Model architecture settings
-model:
-  architecture: "encoder_decoder"
-  d_model: 128
-  num_heads: 4
-  num_encoder_layers: 1
-  num_decoder_layers: 1
-  dropout: 0.0
-
-# Training parameters
-training:
-  batch_size: 32
-  num_epochs: 150     
-  learning_rate: 0.0001
-  weight_decay: 0.0
-  cache_dir: "cache"
-  seed: 42
-  save_every_epoch: true                # Save model after each epoch
-
-# Data generation settings
-data:
-  n: 13                                 # Dyck words semilength
-  data_path: 'data/dyck_data_13.pkl'   # Dataset cache path
-  force_regenerate: false               # Force data regeneration
-  eval_size: 10000                      # Validation set size
 ```
 
 ## Configuration
