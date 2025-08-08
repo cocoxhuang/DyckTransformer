@@ -33,8 +33,9 @@ class Trainer:
         self.logger = logger
 
         # set random seeds for reproducibility
-        seed = config['training'].get('seed', 42)
+        seed = config['training']['seed']
         torch.manual_seed(seed)
+        torch.cuda.manual_seed_all(seed)  # For CUDA reproducibility
         np.random.seed(seed)
         random.seed(seed)
         os.environ["PYTHONHASHSEED"] = str(seed)

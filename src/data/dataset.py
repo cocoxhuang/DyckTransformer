@@ -7,6 +7,16 @@ import os
 
 class Dataset:
     def __init__(self, data, seed = 42, batch_size=32):
+        # Set random seeds FIRST for reproducibility
+        self.seed = seed
+        torch.manual_seed(seed)
+        torch.cuda.manual_seed_all(seed)  # For CUDA reproducibility
+        np.random.seed(seed)
+        random.seed(seed)
+        os.environ["PYTHONHASHSEED"] = str(seed)
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
+        
         self.data = {
             'inputs': data['inputs'].clone(),
             'targets': data['targets'].clone()
@@ -17,12 +27,6 @@ class Dataset:
         self.train_dataloader, self.eval_dataloader = self.create_train_val_dataloader()
         # Move dictionary creation to AFTER data transformation
         self.dictionary = self._create_dictionary()
-        torch.manual_seed(seed)
-        np.random.seed(seed)
-        random.seed(seed)
-        os.environ["PYTHONHASHSEED"] = str(seed)
-        torch.backends.cudnn.deterministic = True
-        torch.backends.cudnn.benchmark = False
         
     def _create_dictionary(self):
         vocab_dict = {
@@ -42,7 +46,15 @@ class Dataset:
 
     def create_dataloader(self, data):
         dataset = torch.utils.data.TensorDataset(data['inputs'], data['targets'])
-        dataloader = torch.utils.data.DataLoader(dataset, batch_size=self.batch_size, shuffle=True)
+        # Create a generator with fixed seed for deterministic shuffling
+        generator = torch.Generator()
+        generator.manual_seed(self.seed)  # Fixed seed for reproducible shuffling
+        dataloader = torch.utils.data.DataLoader(
+            dataset, 
+            batch_size=self.batch_size, 
+            shuffle=True,
+            generator=generator  # Use seeded generator for reproducible shuffle
+        )
         return dataloader
 
     def create_train_val_dataloader(self):
@@ -51,7 +63,7 @@ class Dataset:
         self.data['inputs'] = torch.cat((torch.full((self.data['inputs'].shape[0], 1), self.bos_index, dtype=torch.long), self.data['inputs']), dim=1)
         self.data['targets'] = torch.cat((torch.full((self.data['targets'].shape[0], 1), self.bos_index, dtype=torch.long), self.data['targets']), dim=1)
         
-        shuffle_indices = torch.randperm(len(self.data['inputs']))
+        shuffle_indices = torch.randperm(len(self.data['inputs']), generator=torch.Generator().manual_seed(self.seed))
         train_idx = int(0.8 * len(self.data['inputs']))
         eval_idx = len(self.data['inputs']) - train_idx
         self.data['inputs'] = self.data['inputs'][shuffle_indices]
