@@ -26,6 +26,9 @@ Resume training from a previous session:
 python train.py --resume cache/sesh_20250806_123456
 ```
 
+### Transformer Analysis
+Please see Analysis.ipynb file for example usage.
+
 ## Project Structure
 
 ```

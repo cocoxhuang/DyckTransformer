@@ -81,3 +81,15 @@ class Dataset:
         train_dataloader = self.create_dataloader({'inputs': train_inputs, 'targets': train_targets})
         eval_dataloader = self.create_dataloader({'inputs': eval_inputs, 'targets': eval_targets})
         return train_dataloader, eval_dataloader
+
+def decode(sequence, dictionary):
+    """
+    Decode a sequence of token IDs into a string using the provided dictionary.
+    """
+    decoded_tokens = []
+    for token_id in sequence:
+        if token_id.item() in dictionary:
+            decoded_tokens.append(str(dictionary[token_id.item()]))
+        else:
+            decoded_tokens.append(f"<unk:{token_id.item()}>")  # Handle unknown tokens
+    return ' '.join(decoded_tokens)

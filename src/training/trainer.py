@@ -85,6 +85,7 @@ class Trainer:
         self.logger.info(arch_msg)
         self.logger.info(f"Training using device: {self.device}")
         self.logger.info(f"Model has {self.config['model']['num_encoder_layers']} encoder layers, {self.config['model']['num_decoder_layers']} decoder layers, embedding dimension is {self.config['model']['d_model']}.")
+        self.logger.info(f"Model has {self.config['model']['num_heads']} attention heads.")
         param_count = sum(p.numel() for p in self.model.parameters() if p.requires_grad)
         self.logger.info(f"Model parameters: {param_count:,}")
         pos_enc_msg = f"Model is using {'sinusoidal' if self.model.is_sinusoidal else 'learnable'} positional encoding."

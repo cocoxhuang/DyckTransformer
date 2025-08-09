@@ -64,7 +64,7 @@ class Logger:
 
     def get_config_path(self, config_name="config"):
         """Get config save path with timestamp in cache directory."""
-        return os.path.join(self.cache_dir, f"{config_name}.pth")
+        return os.path.join(self.cache_dir, f"{config_name}")
     
     def info(self, message):
         """Log info message to both console and file."""

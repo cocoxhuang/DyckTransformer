@@ -12,7 +12,7 @@ def main(config_path, resume_from=None):
     
     if resume_from:
         # Load configuration from the resume session
-        resume_config_path = os.path.join(resume_from, "config.pth")
+        resume_config_path = os.path.join(resume_from, "config")
         if os.path.exists(resume_config_path):
             config = load_config(resume_config_path)
             # Use the old configuration but allow some overrides from new config
