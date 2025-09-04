@@ -175,18 +175,39 @@ class Trainer:
                 inputs, targets = batch
                 inputs, targets = inputs.to(self.device), targets.to(self.device)
                 
-                # Teacher forcing: use shifted targets as decoder input
                 self.optimizer.zero_grad()
-                outputs = self.model(
-                    src=inputs,
-                    tgt=targets[:, :-1]  # exclude last token
-                )
-                
-                # Calculate loss on shifted output
-                loss = self.criterion(
-                    outputs.view(-1, outputs.size(-1)),
-                    targets[:, 1:].contiguous().view(-1)  # exclude first token
-                )
+                if self.model.architecture == 'encoder_decoder':
+                    outputs = self.model(
+                        src=inputs,
+                        tgt=targets[:, :-1]  # exclude last token
+                    )
+                    # Calculate loss on shifted output
+                    loss = self.criterion(
+                        outputs.view(-1, outputs.size(-1)),
+                        targets[:, 1:].contiguous().view(-1)  # exclude first token
+                    )
+                elif self.model.architecture == 'encoder_only':
+                    outputs = self.model(
+                        src=inputs
+                    )
+                    # Calculate loss on shmaifted output
+                    loss = self.criterion(
+                        outputs.view(-1, outputs.size(-1)),
+                        targets.view(-1)
+                    )
+                else:  # decoder_only
+                    # For decoder-only: concatenate input and target sequences
+                    full_sequence = torch.cat([inputs, targets], dim=1)  # [batch_size, input_len + target_len]
+                    outputs = self.model(tgt=full_sequence[:, :-1])  # Exclude last token for input. Trying to predict full_sequence[:, 1:] 
+                    
+                    # Calculate loss on shifted output (predict next token)
+                    # We only want to calculate loss on the target portion
+                    input_len = inputs.size(1)
+                    pred_targets = outputs[:, input_len-1:]  # Start from the first target toke
+                    loss = self.criterion(
+                        pred_targets.contiguous().view(-1, pred_targets.size(-1)),
+                        targets.view(-1)
+                    )
                 
                 loss.backward()
                 self.optimizer.step()
@@ -267,8 +288,15 @@ if __name__ == "__main__":
     # Create dataset object
     dataset = Dataset(data, batch_size=config['training']['batch_size'])
     
-    # Update max_len based on actual data
-    max_len = dataset.train_dataloader.dataset[1][1].shape[0]
+    # Update max_len based on actual data and architecture
+    target_len = dataset.train_dataloader.dataset[1][1].shape[0]    # assuming they are all the same len
+    input_len = dataset.train_dataloader.dataset[1][0].shape[0]
+    if config['model']['architecture'] == 'decoder_only':
+        # For decoder-only, we concatenate input + target, so need longer max_len
+        max_len = input_len + target_len
+    else:
+        # For other architectures, use target length or max of input/target
+        max_len = max(input_len, target_len)
     
     # Initialize model
     model = Transformer(

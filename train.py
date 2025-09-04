@@ -36,8 +36,14 @@ def main(config_path, resume_from=None):
     dataset = Dataset(data, config['data']['seed'], batch_size=config['training']['batch_size'])
 
     # Update max_len based on actual data
-    # Assuming all sequences in the dataset have the same length
-    max_len = dataset.train_dataloader.dataset[1][1].shape[0]
+    target_len = dataset.train_dataloader.dataset[1][1].shape[0]    # assuming they are all the same len
+    input_len = dataset.train_dataloader.dataset[1][0].shape[0]
+    if config['model']['architecture'] == 'decoder_only':
+        # For decoder-only, we concatenate input + target, so need longer max_len
+        max_len = input_len + target_len
+    else:
+        # For other architectures, use target length or max of input/target
+        max_len = max(input_len, target_len)
 
     # Initialize the model
     model = Transformer(

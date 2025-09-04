@@ -1,6 +1,11 @@
 # Cache and session directories
 cache/n11_dropout_0_1_sesh
 data/
+cache/decoder/
+cache/encoder/
+configs/decoder.yaml
+configs/encoder.yaml
+
 
 # Python bytecode
 __pycache__/

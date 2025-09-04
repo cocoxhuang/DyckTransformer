@@ -1,5 +1,8 @@
 from matplotlib import pyplot as plt
 from sklearn.decomposition import PCA
+from sklearn.metrics.pairwise import cosine_similarity
+import torch
+import numpy as np
 
 def analyze_cross_attention(model, examples, start_idx=0, step=3, att_head=2, figsize=(15, 12), cmap='Blues', show_diagonal=False, num_examples=9):
     """
@@ -203,7 +206,7 @@ def analyze_decoder_attention(model, examples, start_idx=0, step=10, att_head=0,
     
     return all_outputs
 
-def analyze_cross_attention_all_steps(model, examples, ex_idx=0, att_head=2, cmap='Blues', figsize=(16, 4), show_diagonal=False):
+def analyze_cross_attention_all_steps(model, examples, ex_idx=0, att_head=2, cmap='Blues', figsize=(20, 6), show_diagonal=False):
     """
     Visualize cross-attention for all generation steps for a single example.
     Args:
@@ -230,10 +233,12 @@ def analyze_cross_attention_all_steps(model, examples, ex_idx=0, att_head=2, cma
     attention_history = outputs['attention_history']
     num_steps = len(attention_history)
     cross_att_matrices = []
+    generated = outputs["generated_tokens"][0][-max_new_tokens:]
     
-    # Calculate grid dimensions: 3 subplots per row
-    cols = 3
-    rows = (num_steps + cols - 1) // cols  # Ceiling division
+    # Calculate grid dimensions: 4 subplots per row (including Dyck path plot)
+    cols = 5
+    total_plots = num_steps + 1  # +1 for Dyck path plot
+    rows = (total_plots + cols - 1) // cols  # Ceiling division
     
     # Create figure with subplots
     fig, axes = plt.subplots(rows, cols, figsize=figsize)
@@ -248,6 +253,28 @@ def analyze_cross_attention_all_steps(model, examples, ex_idx=0, att_head=2, cma
     # Flatten axes for easier indexing
     axes_flat = axes.flatten() if rows > 1 or cols > 1 else [axes]
     
+    # Plot 1: Dyck paths visualization (first plot)
+    ax = axes_flat[0]
+    
+    # Plot input, target, and generated paths
+    input_x, input_y = tokens_to_path(inputs.cpu().numpy())
+    target_x, target_y = tokens_to_path(targets.cpu().numpy())
+    gen_x, gen_y = tokens_to_path(generated.cpu().numpy())
+    
+    ax.plot(input_x, input_y, 'b-', label='Input', linewidth=2, alpha=0.7)
+    ax.plot(target_x, target_y, 'g-', label='Target', linewidth=2, alpha=0.7)
+    ax.plot(gen_x, gen_y, 'r--', label='Generated', linewidth=2, alpha=0.7)
+    # draw y = x line
+    max_coord = max(max(gen_x) if gen_x else 0, max(gen_y) if gen_y else 0)
+    ax.plot([0, max_coord], [0, max_coord], 'k--', linewidth=0.5, alpha=0.5)
+    ax.set_title(f'Dyck Paths (Ex {ex_idx})', fontsize=9)
+    ax.set_xlabel('Position', fontsize=8)
+    ax.set_ylabel('Height', fontsize=8)
+    ax.legend(fontsize=7)
+    ax.grid(True, alpha=0.3)
+    ax.tick_params(axis='both', which='major', labelsize=7)
+    
+    # Cross-attention plots (starting from second plot)
     for step in range(num_steps):
         # Extract cross-attention - be very careful about dimensions
         crs_att_raw = attention_history[step]['decoder'][0]['cross_attention']
@@ -278,13 +305,15 @@ def analyze_cross_attention_all_steps(model, examples, ex_idx=0, att_head=2, cma
             
         cross_att_matrices.append(crs_att)
         
-        ax = axes_flat[step]
+        # Plot index is step + 1 (since first plot is Dyck paths)
+        plot_idx = step + 1
+        ax = axes_flat[plot_idx]
         im = ax.imshow(crs_att.cpu().numpy(), cmap=cmap, aspect='auto')
         ax.set_title(f'Step {step}', fontsize=9)
         ax.set_xlabel('Input Pos', fontsize=8)
         
-        # Only show y-label on leftmost column
-        if step % cols == 0:
+        # Only show y-label on leftmost column (excluding first plot)
+        if plot_idx % cols == 1:  # Second column (first attention plot in each row)
             ax.set_ylabel('Gen Pos', fontsize=8)
         else:
             ax.set_ylabel('')
@@ -297,15 +326,21 @@ def analyze_cross_attention_all_steps(model, examples, ex_idx=0, att_head=2, cma
                 ax.plot([1, width-1], [height-2, 0], 'r--', linewidth=1, alpha=0.8)
     
     # Hide unused subplots
-    for i in range(num_steps, len(axes_flat)):
+    for i in range(total_plots, len(axes_flat)):
         axes_flat[i].set_visible(False)
     
     plt.tight_layout()
-    plt.subplots_adjust(top=0.90, hspace=0.4, wspace=0.3)
+    plt.subplots_adjust(top=0.88, hspace=0.4, wspace=0.5)
     
-    cbar = fig.colorbar(im, ax=axes_flat[:num_steps], shrink=0.7, aspect=30, pad=0.02)
-    cbar.set_label('Attention Score', fontsize=9)
-    fig.suptitle(f'Cross-Attention Head {att_head} for Example {ex_idx} (all steps)', fontsize=14, y=0.96)
+    # Add colorbar for attention plots only
+    if num_steps > 0:
+        cbar = fig.colorbar(im, ax=axes_flat[1:num_steps+1], shrink=0.7, aspect=30, pad=0.02)
+        cbar.set_label('Attention Score', fontsize=9)
+    
+    # Check if prediction is correct
+    is_correct = (generated[-max_new_tokens:] == targets[-max_new_tokens:]).all().item()
+    accuracy_text = "✓ Correct" if is_correct else "✗ Incorrect"
+    fig.suptitle(f'Cross-Attention Head {att_head} for Example {ex_idx} ({accuracy_text})', fontsize=14, y=0.96)
     plt.show()
     
     return cross_att_matrices
@@ -427,16 +462,16 @@ def tokens_to_path(tokens):
     y_coords = [0]
 
     for i, token in enumerate(tokens):
-        if token == 2:  # 0 in Dyck path (up step)
-            y_coords.append(y_coords[-1] + 1)
-            x_coords.append(x_coords[-1])
-        elif token == 3:  # 1 in Dyck path (right step)
+        if token == 2:  # 0 in Dyck path (right step)
             y_coords.append(y_coords[-1])
             x_coords.append(x_coords[-1] + 1)
+        elif token == 3:  # 1 in Dyck path (up step)
+            y_coords.append(y_coords[-1] + 1)
+            x_coords.append(x_coords[-1])
         else:  # Other tokens (BOS, EOS, etc.)
             # Skip these tokens entirely - don't add to path
             continue
-    
+
     return x_coords, y_coords
 
 def attention_example(model, examples, ex_idx=0, step=10, cross_att_head=0, encoder_att_head=0, decoder_att_head=0, figsize=(16, 12), cmap='Blues'):
@@ -464,15 +499,25 @@ def attention_example(model, examples, ex_idx=0, step=10, cross_att_head=0, enco
     max_new_tokens = targets.shape[0] - 1
     
     # Generate with attention tracking
-    outputs = model.generate_with_attention_tracking(
-        src=inputs.unsqueeze(0),
-        tgt=targets.unsqueeze(0)[:, :-max_new_tokens],
-        max_new_tokens=max_new_tokens,
-        temperature=1,
-        top_k=1
-    )
-    
-    generated = outputs["generated_tokens"][0]
+    if model.architecture == "encoder_decoder":
+        outputs = model.generate_with_attention_tracking(
+            src=inputs.unsqueeze(0),
+            tgt=targets.unsqueeze(0)[:, :-max_new_tokens],
+            max_new_tokens=max_new_tokens,
+            temperature=1,
+            top_k=1
+        )
+    else:
+        full_sequence = torch.cat([inputs, targets], dim=0)
+        outputs = model.generate_with_attention_tracking(
+            src=None,
+            tgt=full_sequence.unsqueeze(0)[:, :-max_new_tokens],
+            max_new_tokens=max_new_tokens,
+            temperature=1,
+            top_k=1
+        )
+
+    generated = outputs["generated_tokens"][0][-max_new_tokens:]
     
     # Create 2x2 subplot
     fig, axes = plt.subplots(2, 2, figsize=figsize)
@@ -488,6 +533,8 @@ def attention_example(model, examples, ex_idx=0, step=10, cross_att_head=0, enco
     ax1.plot(input_x, input_y, 'b-', label='Input', linewidth=2, alpha=0.7)
     ax1.plot(target_x, target_y, 'g-', label='Target', linewidth=2, alpha=0.7)
     ax1.plot(gen_x, gen_y, 'r--', label='Generated', linewidth=2, alpha=0.7)
+    # draw y = x line
+    ax1.plot([0, max(gen_x)], [0, max(gen_y)], 'k--', linewidth=0.5, alpha=0.5)
     ax1.set_title(f'Dyck Paths (Example {ex_idx})', fontsize=12)
     ax1.set_xlabel('Position')
     ax1.set_ylabel('Height')
@@ -496,21 +543,24 @@ def attention_example(model, examples, ex_idx=0, step=10, cross_att_head=0, enco
     
     # 2. Cross-attention (top-right)
     ax2 = axes[0, 1]
-    crs_att_raw = outputs['attention_history'][step]['decoder'][0]['cross_attention']
-    
-    if crs_att_raw.dim() == 4:
-        crs_att = crs_att_raw[0, cross_att_head, :, :]
-    elif crs_att_raw.dim() == 3:
-        crs_att = crs_att_raw[cross_att_head, :, :]
-    else:
-        crs_att = crs_att_raw.squeeze()
-    
-    if crs_att.dim() == 1:
-        crs_att = crs_att.unsqueeze(0)
-    elif crs_att.dim() > 2:
-        while crs_att.dim() > 2 and crs_att.size(0) == 1:
-            crs_att = crs_att.squeeze(0)
-    
+    try:
+        crs_att_raw = outputs['attention_history'][step]['decoder'][0]['cross_attention']
+        if crs_att_raw.dim() == 4:
+            crs_att = crs_att_raw[0, cross_att_head, :, :]
+        elif crs_att_raw.dim() == 3:
+            crs_att = crs_att_raw[cross_att_head, :, :]
+        else:
+            crs_att = crs_att_raw.squeeze()
+        
+        if crs_att.dim() == 1:
+            crs_att = crs_att.unsqueeze(0)
+        elif crs_att.dim() > 2:
+            while crs_att.dim() > 2 and crs_att.size(0) == 1:
+                crs_att = crs_att.squeeze(0)
+    except KeyError:
+        print("Warning: Cross-attention data not found. Using default empty matrix.")
+        crs_att = torch.zeros((1, 1))  # Default empty attention matrix
+
     im2 = ax2.imshow(crs_att.cpu().numpy(), cmap=cmap, aspect='auto')
     ax2.set_title(f'Cross-Attention (Step {step}, Head {cross_att_head})', fontsize=12)
     ax2.set_xlabel('Input Position')
@@ -518,21 +568,24 @@ def attention_example(model, examples, ex_idx=0, step=10, cross_att_head=0, enco
     
     # 3. Encoder self-attention (bottom-left)
     ax3 = axes[1, 0]
-    enc_att_raw = outputs['attention_history'][0]['encoder'][0]['self_attention']  # Encoder computed at step 0
-    
-    if enc_att_raw.dim() == 4:
-        enc_att = enc_att_raw[0, encoder_att_head, :, :]
-    elif enc_att_raw.dim() == 3:
-        enc_att = enc_att_raw[encoder_att_head, :, :]
-    else:
-        enc_att = enc_att_raw.squeeze()
-    
-    if enc_att.dim() == 1:
-        enc_att = enc_att.unsqueeze(0)
-    elif enc_att.dim() > 2:
-        while enc_att.dim() > 2 and enc_att.size(0) == 1:
-            enc_att = enc_att.squeeze(0)
-    
+    try:
+        enc_att_raw = outputs['attention_history'][0]['encoder'][0]['self_attention']  # Encoder computed at step 0
+        if enc_att_raw.dim() == 4:
+            enc_att = enc_att_raw[0, encoder_att_head, :, :]
+        elif enc_att_raw.dim() == 3:
+            enc_att = enc_att_raw[encoder_att_head, :, :]
+        else:
+            enc_att = enc_att_raw.squeeze()
+
+        if enc_att.dim() == 1:
+            enc_att = enc_att.unsqueeze(0)
+        elif enc_att.dim() > 2:
+            while enc_att.dim() > 2 and enc_att.size(0) == 1:
+                enc_att = enc_att.squeeze(0)
+    except KeyError:
+        print("Warning: Encoder self-attention data not found. Using default empty matrix.")
+        enc_att = torch.zeros((1, 1))  # Default empty attention matrix  
+
     im3 = ax3.imshow(enc_att.cpu().numpy(), cmap=cmap, aspect='auto')
     ax3.set_title(f'Encoder Self-Attention (Head {encoder_att_head})', fontsize=12)
     ax3.set_xlabel('Key Position')
@@ -540,21 +593,24 @@ def attention_example(model, examples, ex_idx=0, step=10, cross_att_head=0, enco
     
     # 4. Decoder self-attention (bottom-right)
     ax4 = axes[1, 1]
-    dec_self_att_raw = outputs['attention_history'][step]['decoder'][0]['self_attention']
-    
-    if dec_self_att_raw.dim() == 4:
-        dec_self_att = dec_self_att_raw[0, decoder_att_head, :, :]
-    elif dec_self_att_raw.dim() == 3:
-        dec_self_att = dec_self_att_raw[decoder_att_head, :, :]
-    else:
-        dec_self_att = dec_self_att_raw.squeeze()
-    
-    if dec_self_att.dim() == 1:
-        dec_self_att = dec_self_att.unsqueeze(0)
-    elif dec_self_att.dim() > 2:
-        while dec_self_att.dim() > 2 and dec_self_att.size(0) == 1:
-            dec_self_att = dec_self_att.squeeze(0)
-    
+    try:
+        dec_self_att_raw = outputs['attention_history'][step]['decoder'][0]['self_attention']
+        if dec_self_att_raw.dim() == 4:
+            dec_self_att = dec_self_att_raw[0, decoder_att_head, :, :]
+        elif dec_self_att_raw.dim() == 3:
+            dec_self_att = dec_self_att_raw[decoder_att_head, :, :]
+        else:
+            dec_self_att = dec_self_att_raw.squeeze()
+        
+        if dec_self_att.dim() == 1:
+            dec_self_att = dec_self_att.unsqueeze(0)
+        elif dec_self_att.dim() > 2:
+            while dec_self_att.dim() > 2 and dec_self_att.size(0) == 1:
+                dec_self_att = dec_self_att.squeeze(0)
+    except KeyError:
+        print("Warning: Decoder self-attention data not found. Using default empty matrix.")
+        dec_self_att = torch.zeros((1, 1))  # Default empty attention matrix
+
     im4 = ax4.imshow(dec_self_att.cpu().numpy(), cmap=cmap, aspect='auto')
     ax4.set_title(f'Decoder Self-Attention (Step {step}, Head {decoder_att_head})', fontsize=12)
     ax4.set_xlabel('Key Position')
@@ -649,3 +705,349 @@ def analyze_embeddings_pca(model, dataset, figsize=(10, 8), alpha=0.5, fontsize=
         'explained_variance_ratio': pca.explained_variance_ratio_,
         'total_variance_explained': pca.explained_variance_ratio_.sum()
     }
+
+def analyze_positional_embeddings_pca(model, module = "encoder", n_components=28, figsize = (12,10), plot_labels = True):
+    """
+    Analyze and visualize positional embeddings using PCA.
+
+    Args:
+        model: The transformer model
+        module: Which module to analyze ("source" or "target")
+        figsize: Figure size for the plot
+
+    Returns:
+        dict: Dictionary containing PCA results
+    """
+    # Extract positional encoding weights
+    if module == "encoder":
+        assert model.src_pos_encoding is not None, "Ensure your model has an encoder."
+        pos_encoding_weights = model.src_pos_encoding.pe.weight.data.cpu().numpy()
+    if module == "decoder":
+        assert model.tgt_pos_encoding is not None, "Ensure your model has a decoder."
+        pos_encoding_weights = model.tgt_pos_encoding.pe.weight.data.cpu().numpy()
+
+    # Perform PCA with multiple components
+    n_components = min(n_components, pos_encoding_weights.shape[0], pos_encoding_weights.shape[1])
+    pca = PCA(n_components=n_components)
+    pos_pca_full = pca.fit_transform(pos_encoding_weights)
+
+    # Also do 2D PCA for visualization
+    pca_2d = PCA(n_components=2)
+    pos_pca_2d = pca_2d.fit_transform(pos_encoding_weights)
+
+    # Create comprehensive PCA visualization
+    fig = plt.figure(figsize=figsize)
+    fig.suptitle(f"{module} positional embeddings PCA", fontsize=16, y=0.98)
+
+    # Plot 1: 2D PCA scatter plot
+    plt.subplot(2, 3, 1)
+    scatter = plt.scatter(pos_pca_2d[:, 0], pos_pca_2d[:, 1], c=range(len(pos_pca_2d)), cmap='viridis', alpha=0.8, s=50)
+    plt.colorbar(scatter, label='Position Index')
+    plt.xlabel(f'PC1 ({pca_2d.explained_variance_ratio_[0]:.2%} variance)')
+    plt.ylabel(f'PC2 ({pca_2d.explained_variance_ratio_[1]:.2%} variance)')
+    plt.title('PCA: Positions in 2D Space', pad=20)
+    plt.grid(True, alpha=0.3)
+
+    # Add position labels for small datasets
+    if plot_labels:
+        for i, (x, y) in enumerate(pos_pca_2d):
+            plt.annotate(str(i), (x, y), xytext=(5, 5), textcoords='offset points', fontsize=8, alpha=0.7)
+
+    # Plot 2: Explained variance ratio
+    plt.subplot(2, 3, 2)
+    plt.plot(range(1, n_components + 1), pca.explained_variance_ratio_, 'bo-')
+    plt.xlabel('Principal Component')
+    plt.ylabel('Explained Variance Ratio')
+    plt.title('Explained Variance by Component', pad=20)
+    plt.grid(True, alpha=0.3)
+
+    # Plot 3: Cumulative explained variance
+    plt.subplot(2, 3, 3)
+    cumulative_variance = np.cumsum(pca.explained_variance_ratio_)
+    plt.plot(range(1, n_components + 1), cumulative_variance, 'ro-')
+    plt.axhline(y=0.95, color='g', linestyle='--', alpha=0.7, label='95% variance')
+    plt.axhline(y=0.99, color='r', linestyle='--', alpha=0.7, label='99% variance')
+    plt.xlabel('Number of Components')
+    plt.ylabel('Cumulative Explained Variance')
+    plt.title('Cumulative Explained Variance', pad=20)
+    plt.legend()
+    plt.grid(True, alpha=0.3)
+
+    # Plot 4: Position trajectory in PC1-PC2 space
+    plt.subplot(2, 3, 4)
+    plt.plot(pos_pca_2d[:, 0], pos_pca_2d[:, 1], 'o-', alpha=0.7, markersize=4)
+    plt.scatter(pos_pca_2d[0, 0], pos_pca_2d[0, 1], c='red', s=100, marker='s', label='Start (pos 0)')
+    plt.scatter(pos_pca_2d[-1, 0], pos_pca_2d[-1, 1], c='blue', s=100, marker='^', label=f'End (pos {len(pos_pca_2d)-1})')
+    plt.xlabel(f'PC1 ({pca_2d.explained_variance_ratio_[0]:.2%})')
+    plt.ylabel(f'PC2 ({pca_2d.explained_variance_ratio_[1]:.2%})')
+    plt.title('Position Trajectory in PCA Space', pad=20)
+    plt.legend()
+    plt.grid(True, alpha=0.3)
+
+    # Add position labels for small datasets
+    if plot_labels:
+        for i, (x, y) in enumerate(pos_pca_2d):
+            plt.annotate(str(i), (x, y), xytext=(5, 5), textcoords='offset points', fontsize=8, alpha=0.7)
+
+    # Plot 5: PC1 vs position index
+    plt.subplot(2, 3, 5)
+    plt.plot(range(len(pos_pca_2d)), pos_pca_2d[:, 0], 'o-', alpha=0.7)
+    plt.xlabel('Position Index')
+    plt.ylabel(f'PC1 Score ({pca_2d.explained_variance_ratio_[0]:.2%} var)')
+    plt.title('PC1 Scores vs Position', pad=20)
+    plt.grid(True, alpha=0.3)
+
+    # Plot 6: PC2 vs position index
+    plt.subplot(2, 3, 6)
+    plt.plot(range(len(pos_pca_2d)), pos_pca_2d[:, 1], 'o-', alpha=0.7, color='orange')
+    plt.xlabel('Position Index')
+    plt.ylabel(f'PC2 Score ({pca_2d.explained_variance_ratio_[1]:.2%} var)')
+    plt.title('PC2 Scores vs Position', pad=20)
+    plt.grid(True, alpha=0.3)
+
+    # Add proper spacing between subplots and adjust layout
+    plt.tight_layout(rect=[0, 0, 1, 0.95])
+    plt.subplots_adjust(left=0.08, right=0.95, top=0.88, bottom=0.12, hspace=0.45, wspace=0.35)
+    plt.show()
+
+    return {
+        'pos_pca_full': pos_pca_full,
+        'pos_pca_2d': pos_pca_2d,
+        'explained_variance_ratio': pca.explained_variance_ratio_,
+        'total_variance_explained': pca.explained_variance_ratio_.sum()
+    }
+    
+def analyze_positional_embeddings_similarity(model, module = "encoder", figsize = (10,10)):
+    # Extract positional encoding weights
+    if module == "encoder":
+        assert model.src_pos_encoding is not None, "Ensure your model has an encoder."
+        pos_encoding_weights = model.src_pos_encoding.pe.weight.data.cpu().numpy()
+    if module == "decoder":
+        assert model.tgt_pos_encoding is not None, "Ensure your model has a decoder."
+        pos_encoding_weights = model.tgt_pos_encoding.pe.weight.data.cpu().numpy()
+
+    # Compute similarity matrix
+    similarity_matrix = cosine_similarity(pos_encoding_weights)
+
+    # Create comprehensive similarity analysis
+    fig = plt.figure(figsize=figsize)
+    fig.suptitle(f"{module} positional embeddings similarity", fontsize=16, y=0.98)
+
+    # Plot 1: Full similarity matrix
+    plt.subplot(2, 2, 1)
+    im1 = plt.imshow(similarity_matrix, cmap='RdYlBu_r', interpolation='nearest', vmin=-1, vmax=1)
+    plt.colorbar(im1, label='Cosine Similarity')
+    plt.xlabel('Position')
+    plt.ylabel('Position')
+    plt.title('Complete Similarity Matrix', pad=20)
+
+    # Plot 2: Adjacent position similarities
+    plt.subplot(2, 2, 2)
+    adjacent_similarities = [similarity_matrix[i, i+1] for i in range(len(similarity_matrix)-1)]
+    plt.plot(adjacent_similarities, 'o-', alpha=0.7)
+    plt.xlabel('Position')
+    plt.ylabel('Similarity with Next Position')
+    plt.title('Adjacent Position Similarities', pad=20)
+    plt.grid(True, alpha=0.3)
+
+    # Plot 3: Distance-based similarity analysis
+    plt.subplot(2, 2, 3)
+    distances = []
+    similarities = []
+    for i in range(len(similarity_matrix)):
+        for j in range(i+1, len(similarity_matrix)):
+            distance = abs(i - j)
+            similarity = similarity_matrix[i, j]
+            distances.append(distance)
+            similarities.append(similarity)
+
+    # Group by distance and compute mean similarity
+    unique_distances = sorted(set(distances))
+    mean_similarities = []
+    for d in unique_distances:
+        sims_at_distance = [similarities[k] for k, dist in enumerate(distances) if dist == d]
+        mean_similarities.append(np.mean(sims_at_distance))
+
+    plt.plot(unique_distances, mean_similarities, 'o-', alpha=0.7)
+    plt.xlabel('Position Distance')
+    plt.ylabel('Average Similarity')
+    plt.title('Similarity vs Position Distance', pad=20)
+    plt.grid(True, alpha=0.3)
+
+    # Add proper spacing between subplots and adjust layout
+    plt.tight_layout(rect=[0, 0, 1, 0.95])
+    plt.subplots_adjust(left=0.1, right=0.95, top=0.90, bottom=0.1, hspace=0.4, wspace=0.3)
+    plt.show()
+
+    return similarity_matrix
+
+def analyze_positional_embeddings_tsne(model, module = "encoder", perplexity=30, n_iter=1000, figsize=(10,8), fontsize=10):
+    """
+    Analyze and visualize positional embeddings using t-SNE.
+    
+    Args:
+        model: The transformer model
+        module: Which module to analyze ("source" or "target")
+        perplexity: t-SNE perplexity parameter
+        n_iter: Number of iterations for t-SNE optimization
+        figsize: Figure size for the plot
+        fontsize: Font size for annotations
+    
+    Returns:
+        dict: Dictionary containing t-SNE results
+    """
+    
+    # Get positional encoding weights from model
+    if module == "encoder":
+        assert model.src_pos_encoding is not None, "Ensure your model has an encoder."
+        pos_encoding_weights = model.src_pos_encoding.pe.weight.data.cpu().numpy()
+    if module == "decoder":
+        assert model.tgt_pos_encoding is not None, "Ensure your model has a decoder."
+        pos_encoding_weights = model.tgt_pos_encoding.pe.weight.data.cpu().numpy()
+    
+    # Initialize t-SNE
+    tsne = TSNE(n_components=2, perplexity=perplexity, n_iter=n_iter, random_state=42)
+    
+    # Transform positional embeddings to 2D
+    pos_tsne = tsne.fit_transform(pos_encoding_weights)
+    
+    # Create visualization
+    fig, ax = plt.subplots(figsize=figsize)
+    
+    # Plot t-SNE results
+    scatter = ax.scatter(pos_tsne[:, 0], pos_tsne[:, 1], c=range(len(pos_tsne)), cmap='viridis', alpha=0.8, s=50)
+    plt.colorbar(scatter, label='Position Index')
+    ax.set_title(f't-SNE of {module} Positional Embeddings', fontsize=14)
+    ax.set_xlabel('t-SNE Dimension 1', fontsize=fontsize)
+    ax.set_ylabel('t-SNE Dimension 2', fontsize=fontsize)
+    ax.grid(True, alpha=0.3)
+    
+    # Add position labels for small datasets
+    if len(pos_tsne) <= 100:  # Only label if we have a manageable number of positions
+        for i, (x, y) in enumerate(pos_tsne):
+            ax.annotate(f'{i}', (x, y), xytext=(5, 5), textcoords='offset points', 
+                       fontsize=fontsize, ha='left', va='bottom', color='black')
+
+
+# Create Fourier basis functions
+def create_fourier_basis(n_positions, n_components):
+    """Create Fourier basis functions for projection"""
+    basis = np.zeros((n_positions, n_components))
+    
+    # DC component
+    basis[:, 0] = 1.0 / np.sqrt(n_positions)
+    
+    # Sine and cosine components
+    for k in range(1, n_components // 2 + 1):
+        if 2*k-1 < n_components:
+            # Cosine component
+            basis[:, 2*k-1] = np.sqrt(2/n_positions) * np.cos(2*np.pi*k*np.arange(n_positions)/n_positions)
+        if 2*k < n_components:
+            # Sine component  
+            basis[:, 2*k] = np.sqrt(2/n_positions) * np.sin(2*np.pi*k*np.arange(n_positions)/n_positions)
+    
+    return basis
+        
+def analyze_positional_embeddings_fourier(model, module = "encoder", figsize = (20,15)):
+    """
+    Analyze and visualize positional embeddings using Fourier basis projection.
+
+    Args: 
+        model: The transformer model
+        module: Which module to analyze ("encoder" or "decoder")
+        figsize: Figure size for the entire plot
+    """
+
+    # Extract positional encoding weights
+    if module == "encoder":
+        assert model.src_pos_encoding is not None, "Ensure your model has an encoder."
+        pos_encoding_weights = model.src_pos_encoding.pe.weight.data.cpu().numpy()
+    if module == "decoder":
+        assert model.tgt_pos_encoding is not None, "Ensure your model has a decoder."
+        pos_encoding_weights = model.tgt_pos_encoding.pe.weight.data.cpu().numpy()
+
+    n_positions, d_model = pos_encoding_weights.shape
+
+    # Number of Fourier components to use
+    n_fourier_components = n_positions
+    fourier_basis = create_fourier_basis(n_positions, n_fourier_components)
+
+    # Project each embedding dimension onto Fourier basis
+    fourier_projections = np.dot(fourier_basis.T, pos_encoding_weights)  # Shape: (n_fourier_components, d_model)
+
+    # Compute power spectrum for each embedding dimension
+    power_spectra = fourier_projections ** 2
+
+    # Create comprehensive visualization
+    fig = plt.figure(figsize=figsize)
+    fig.suptitle(f"{module} Positional Embeddings Fourier Analysis", fontsize=16, y=0.98)
+
+    # Plot 1: Original positional encoding heatmap
+    plt.subplot(2, 3, 1)
+    im = plt.imshow(pos_encoding_weights.T, aspect='auto', cmap='RdBu_r', interpolation='nearest')
+    plt.colorbar(im, label='Weight Value')
+    plt.xlabel('Position')
+    plt.ylabel('Embedding Dimension')
+    plt.title('Original Positional Encoding', pad=20)
+
+    # Plot 2: Fourier projections heatmap
+    plt.subplot(2, 3, 2)
+    im = plt.imshow(fourier_projections, aspect='auto', cmap='RdBu_r', interpolation='nearest')
+    plt.colorbar(im, label='Projection Coefficient')
+    plt.xlabel('Embedding Dimension')
+    plt.ylabel('Fourier Component')
+    plt.title('Fourier Projections', pad=20)
+
+    # Plot 3: Power spectrum for each embedding dimension
+    plt.subplot(2, 3, 3)
+    im = plt.imshow(power_spectra, aspect='auto', cmap='hot', interpolation='nearest')
+    plt.colorbar(im, label='Power')
+    plt.xlabel('Embedding Dimension')
+    plt.ylabel('Fourier Component')
+    plt.title('Power Spectrum (All Dimensions)', pad=20)
+
+    # Plot 4: Reconstruction using top Fourier components
+    plt.subplot(2, 3, 4)
+    n_recon_components = min(6, n_fourier_components)
+    reconstructed = np.dot(fourier_basis[:, :n_recon_components], fourier_projections[:n_recon_components, :])
+    im = plt.imshow(reconstructed.T, aspect='auto', cmap='RdBu_r', interpolation='nearest')
+    plt.colorbar(im, label='Weight Value')
+    plt.xlabel('Position')
+    plt.ylabel('Embedding Dimension')
+    plt.title(f'Reconstruction (Top {n_recon_components} Components)', pad=20)
+
+    # Plot 5: Reconstruction error
+    plt.subplot(2, 3, 5)
+    reconstruction_errors = []
+    component_counts = range(1, min(n_fourier_components, n_positions) + 1)
+    for n_comp in component_counts:
+        recon = np.dot(fourier_basis[:, :n_comp], fourier_projections[:n_comp, :])
+        error = np.mean((pos_encoding_weights - recon) ** 2)
+        reconstruction_errors.append(error)
+
+    plt.plot(component_counts, reconstruction_errors, 'o-', alpha=0.7)
+    plt.xlabel('Number of Fourier Components')
+    plt.ylabel('Mean Squared Error')
+    plt.title('Reconstruction Error', pad=20)
+    plt.grid(True, alpha=0.3)
+
+    # Plot 6: Fourier basis functions (first few)
+    plt.subplot(2, 3, 6)
+    for i in range(min(6, n_fourier_components)):
+        plt.plot(fourier_basis[:, i], label=f'Component {i}', alpha=0.7)
+    plt.xlabel('Position')
+    plt.ylabel('Basis Function Value')
+    plt.title('Fourier Basis Functions (First Few)', pad=20)
+    plt.legend()
+    plt.grid(True, alpha=0.3)
+
+    # Add proper spacing between subplots and adjust layout
+    plt.tight_layout(rect=[0, 0, 1, 0.95])
+    plt.subplots_adjust(left=0.08, right=0.95, top=0.88, bottom=0.12, hspace=0.45, wspace=0.35)
+    plt.show()
+
+    return {
+        "fourier_basis": fourier_basis,
+        "fourier_projections": fourier_projections,
+        "reconstruction_errors": reconstruction_errors,
+}

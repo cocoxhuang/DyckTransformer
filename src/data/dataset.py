@@ -6,7 +6,7 @@ import random
 import os
 
 class Dataset:
-    def __init__(self, data, seed = 42, batch_size=32):
+    def __init__(self, data, seed = 42, batch_size = 32, decoder_only=False):
         # Set random seeds FIRST for reproducibility
         self.seed = seed
         torch.manual_seed(seed)
@@ -21,13 +21,14 @@ class Dataset:
             'inputs': data['inputs'].clone(),
             'targets': data['targets'].clone()
         }
+        self.decoder_only = decoder_only
         self.bos_index = 0  # Beginning of sequence token index
         self.eos_index = 1  # End of sequence token index
         self.batch_size = batch_size
         self.train_dataloader, self.eval_dataloader = self.create_train_val_dataloader()
         # Move dictionary creation to AFTER data transformation
         self.dictionary = self._create_dictionary()
-        
+       
     def _create_dictionary(self):
         vocab_dict = {
             self.bos_index: 'bos',
@@ -60,9 +61,16 @@ class Dataset:
     def create_train_val_dataloader(self):
         self.data['inputs'] = self.data['inputs'] + max(self.bos_index, self.eos_index) + 1
         self.data['targets'] = self.data['targets'] + max(self.bos_index, self.eos_index) + 1
-        self.data['inputs'] = torch.cat((torch.full((self.data['inputs'].shape[0], 1), self.bos_index, dtype=torch.long), self.data['inputs']), dim=1)
-        self.data['targets'] = torch.cat((torch.full((self.data['targets'].shape[0], 1), self.bos_index, dtype=torch.long), self.data['targets']), dim=1)
-        
+        if self.decoder_only:
+            # the inputs and targets are just patched with BOS token in the front and EOS token in the end
+            self.data['inputs'] = torch.cat((torch.full((self.data['inputs'].shape[0], 1), self.bos_index, dtype=torch.long), self.data['inputs'], torch.full((self.data['inputs'].shape[0], 1), self.eos_index, dtype=torch.long)), dim=1)
+            self.data['targets'] = torch.cat((torch.full((self.data['targets'].shape[0], 1), self.bos_index, dtype=torch.long), self.data['targets'], torch.full((self.data['targets'].shape[0], 1), self.eos_index, dtype=torch.long)), dim=1)
+        else:
+            # the inputs and targets are just patched with BOS token in the front
+            # this is due to the current trained models being trained in such data structure
+            self.data['inputs'] = torch.cat((torch.full((self.data['inputs'].shape[0], 1), self.bos_index, dtype=torch.long), self.data['inputs']), dim=1)
+            self.data['targets'] = torch.cat((torch.full((self.data['targets'].shape[0], 1), self.bos_index, dtype=torch.long), self.data['targets']), dim=1)
+
         shuffle_indices = torch.randperm(len(self.data['inputs']), generator=torch.Generator().manual_seed(self.seed))
         train_idx = int(0.8 * len(self.data['inputs']))
         eval_idx = len(self.data['inputs']) - train_idx

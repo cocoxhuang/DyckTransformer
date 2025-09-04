@@ -214,29 +214,6 @@ class Transformer(nn.Module):
             tgt_emb = layer(tgt_emb, encoder_output=src_emb, src_mask=src_mask, tgt_mask=tgt_mask)
         
         return self.fc_out(tgt_emb)
-    
-    def generate(self, src, tgt, max_new_tokens, temperature=1.0, top_k=None):
-        if self.architecture == 'encoder_only':
-            raise ValueError("Generation is not supported for encoder-only models")
-        assert tgt is not None, "Target sequence must be provided for generation"
-            
-        for _ in range(max_new_tokens):
-            if self.architecture == 'decoder_only':
-                logits = self(tgt=tgt)
-            else:
-                logits = self(src=src, tgt=tgt)
-            
-            logits = logits[:, -1, :] / temperature
-            
-            if top_k is not None:
-                v, _ = torch.topk(logits, min(top_k, logits.size(-1)))
-                logits[logits < v[:, [-1]]] = -float('Inf')
-            
-            probs = F.softmax(logits, dim=-1)
-            next_token = torch.multinomial(probs, num_samples=1)
-            tgt = torch.cat((tgt, next_token), dim=1)
-        
-        return tgt
 
     def generate(self, src, tgt, max_new_tokens, temperature=1.0, top_k=None):
         if self.architecture == 'encoder_only':
