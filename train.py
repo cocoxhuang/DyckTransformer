@@ -57,7 +57,8 @@ def main(config_path, resume_from=None):
         max_len=max_len,  # Use actual data length
         dropout=config['model']['dropout'],
         architecture=config['model']['architecture'],
-        is_sinusoidal=config['model']['is_sinusoidal']
+        is_sinusoidal=config['model']['is_sinusoidal'],
+        seed = config['model']['seed']
     )
 
     # Initialize the trainer (it will create its own logger)

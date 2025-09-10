@@ -1,0 +1,122 @@
+2025-09-10 13:33:00,749 - DyckTransformer - INFO - ==================================================
+2025-09-10 13:33:00,749 - DyckTransformer - INFO - Logging initialized. Log file: cache/sesh_20250910_133300/training.log
+2025-09-10 13:33:00,750 - DyckTransformer - INFO - Loading cached Dyck words data for n=13 from data/dyck_data_13.pkl...
+2025-09-10 13:33:01,171 - DyckTransformer - INFO - Successfully loaded cached data with 742900 sequences.
+2025-09-10 13:33:01,172 - DyckTransformer - INFO - Input shape: torch.Size([742900, 26])
+2025-09-10 13:33:01,172 - DyckTransformer - INFO - Target shape: torch.Size([742900, 26])
+2025-09-10 13:33:01,172 - DyckTransformer - INFO - Time taken to load data: 0.4221 seconds.
+2025-09-10 13:33:03,336 - DyckTransformer - INFO - Training using device: cuda
+2025-09-10 13:33:03,449 - DyckTransformer - INFO - ============ Model Information ============
+2025-09-10 13:33:03,449 - DyckTransformer - INFO - Model is encoder-decoder.
+2025-09-10 13:33:03,449 - DyckTransformer - INFO - Training using device: cuda
+2025-09-10 13:33:03,449 - DyckTransformer - INFO - Model has 1 encoder layers, 1 decoder layers, embedding dimension is 128.
+2025-09-10 13:33:03,449 - DyckTransformer - INFO - Model has 4 attention heads.
+2025-09-10 13:33:03,449 - DyckTransformer - INFO - Model parameters: 339,716
+2025-09-10 13:33:03,449 - DyckTransformer - INFO - Model is using learnable positional encoding.
+2025-09-10 13:33:03,451 - DyckTransformer - INFO - Configuration saved to cache/sesh_20250910_133300/config
+2025-09-10 13:33:03,451 - DyckTransformer - INFO - ============ Start Training ============
+2025-09-10 13:35:40,623 - DyckTransformer - INFO - Epoch 1/33, Training Loss: 0.4342, Time: 157.17s
+2025-09-10 13:36:00,521 - DyckTransformer - INFO - For validation data: loss = 0.3914, accuracy = 0.00040000, Time: 19.90s
+2025-09-10 13:36:00,521 - DyckTransformer - INFO - New best model found at epoch 1
+2025-09-10 13:36:00,561 - DyckTransformer - INFO - Best model saved to cache/sesh_20250910_133300/best_model.pth
+2025-09-10 13:38:35,778 - DyckTransformer - INFO - Epoch 2/33, Training Loss: 0.3576, Time: 155.22s
+2025-09-10 13:38:54,934 - DyckTransformer - INFO - For validation data: loss = 0.3196, accuracy = 0.00290000, Time: 19.15s
+2025-09-10 13:38:54,934 - DyckTransformer - INFO - New best model found at epoch 2
+2025-09-10 13:38:54,980 - DyckTransformer - INFO - Best model saved to cache/sesh_20250910_133300/best_model.pth
+2025-09-10 13:41:34,490 - DyckTransformer - INFO - Epoch 3/33, Training Loss: 0.2722, Time: 159.51s
+2025-09-10 13:41:55,633 - DyckTransformer - INFO - For validation data: loss = 0.2210, accuracy = 0.05550000, Time: 21.14s
+2025-09-10 13:41:55,633 - DyckTransformer - INFO - New best model found at epoch 3
+2025-09-10 13:41:55,670 - DyckTransformer - INFO - Best model saved to cache/sesh_20250910_133300/best_model.pth
+2025-09-10 13:44:31,722 - DyckTransformer - INFO - Epoch 4/33, Training Loss: 0.1740, Time: 156.05s
+2025-09-10 13:44:49,779 - DyckTransformer - INFO - For validation data: loss = 0.1277, accuracy = 0.26270000, Time: 18.06s
+2025-09-10 13:44:49,779 - DyckTransformer - INFO - New best model found at epoch 4
+2025-09-10 13:44:49,815 - DyckTransformer - INFO - Best model saved to cache/sesh_20250910_133300/best_model.pth
+2025-09-10 13:47:28,298 - DyckTransformer - INFO - Epoch 5/33, Training Loss: 0.0918, Time: 158.48s
+2025-09-10 13:47:46,712 - DyckTransformer - INFO - For validation data: loss = 0.0609, accuracy = 0.54460000, Time: 18.41s
+2025-09-10 13:47:46,712 - DyckTransformer - INFO - New best model found at epoch 5
+2025-09-10 13:47:46,752 - DyckTransformer - INFO - Best model saved to cache/sesh_20250910_133300/best_model.pth
+2025-09-10 13:50:24,223 - DyckTransformer - INFO - Epoch 6/33, Training Loss: 0.0485, Time: 157.47s
+2025-09-10 13:50:41,861 - DyckTransformer - INFO - For validation data: loss = 0.0317, accuracy = 0.73570000, Time: 17.64s
+2025-09-10 13:50:41,861 - DyckTransformer - INFO - New best model found at epoch 6
+2025-09-10 13:50:41,897 - DyckTransformer - INFO - Best model saved to cache/sesh_20250910_133300/best_model.pth
+2025-09-10 13:53:19,283 - DyckTransformer - INFO - Epoch 7/33, Training Loss: 0.0273, Time: 157.39s
+2025-09-10 13:53:37,634 - DyckTransformer - INFO - For validation data: loss = 0.0228, accuracy = 0.79690000, Time: 18.35s
+2025-09-10 13:53:37,634 - DyckTransformer - INFO - New best model found at epoch 7
+2025-09-10 13:53:37,680 - DyckTransformer - INFO - Best model saved to cache/sesh_20250910_133300/best_model.pth
+2025-09-10 13:56:13,039 - DyckTransformer - INFO - Epoch 8/33, Training Loss: 0.0168, Time: 155.36s
+2025-09-10 13:56:29,852 - DyckTransformer - INFO - For validation data: loss = 0.0098, accuracy = 0.91780000, Time: 16.81s
+2025-09-10 13:56:29,852 - DyckTransformer - INFO - New best model found at epoch 8
+2025-09-10 13:56:29,888 - DyckTransformer - INFO - Best model saved to cache/sesh_20250910_133300/best_model.pth
+2025-09-10 13:59:06,145 - DyckTransformer - INFO - Epoch 9/33, Training Loss: 0.0109, Time: 156.26s
+2025-09-10 13:59:26,345 - DyckTransformer - INFO - For validation data: loss = 0.0083, accuracy = 0.92730000, Time: 20.20s
+2025-09-10 13:59:26,345 - DyckTransformer - INFO - New best model found at epoch 9
+2025-09-10 13:59:26,383 - DyckTransformer - INFO - Best model saved to cache/sesh_20250910_133300/best_model.pth
+2025-09-10 14:02:04,820 - DyckTransformer - INFO - Epoch 10/33, Training Loss: 0.0076, Time: 158.44s
+2025-09-10 14:02:23,288 - DyckTransformer - INFO - For validation data: loss = 0.0201, accuracy = 0.83340000, Time: 18.47s
+2025-09-10 14:05:02,057 - DyckTransformer - INFO - Epoch 11/33, Training Loss: 0.0056, Time: 158.73s
+2025-09-10 14:05:20,692 - DyckTransformer - INFO - For validation data: loss = 0.0079, accuracy = 0.93100000, Time: 18.63s
+2025-09-10 14:05:20,692 - DyckTransformer - INFO - New best model found at epoch 11
+2025-09-10 14:05:20,728 - DyckTransformer - INFO - Best model saved to cache/sesh_20250910_133300/best_model.pth
+2025-09-10 14:07:56,332 - DyckTransformer - INFO - Epoch 12/33, Training Loss: 0.0045, Time: 155.60s
+2025-09-10 14:08:13,787 - DyckTransformer - INFO - For validation data: loss = 0.0017, accuracy = 0.98670000, Time: 17.45s
+2025-09-10 14:08:13,787 - DyckTransformer - INFO - New best model found at epoch 12
+2025-09-10 14:08:13,822 - DyckTransformer - INFO - Best model saved to cache/sesh_20250910_133300/best_model.pth
+2025-09-10 14:10:54,268 - DyckTransformer - INFO - Epoch 13/33, Training Loss: 0.0037, Time: 160.45s
+2025-09-10 14:11:13,481 - DyckTransformer - INFO - For validation data: loss = 0.0032, accuracy = 0.97350000, Time: 19.21s
+2025-09-10 14:13:51,288 - DyckTransformer - INFO - Epoch 14/33, Training Loss: 0.0031, Time: 157.77s
+2025-09-10 14:14:08,154 - DyckTransformer - INFO - For validation data: loss = 0.0010, accuracy = 0.99260000, Time: 16.87s
+2025-09-10 14:14:08,154 - DyckTransformer - INFO - New best model found at epoch 14
+2025-09-10 14:14:08,196 - DyckTransformer - INFO - Best model saved to cache/sesh_20250910_133300/best_model.pth
+2025-09-10 14:16:46,464 - DyckTransformer - INFO - Epoch 15/33, Training Loss: 0.0026, Time: 158.27s
+2025-09-10 14:17:05,064 - DyckTransformer - INFO - For validation data: loss = 0.0007, accuracy = 0.99430000, Time: 18.60s
+2025-09-10 14:17:05,064 - DyckTransformer - INFO - New best model found at epoch 15
+2025-09-10 14:17:05,102 - DyckTransformer - INFO - Best model saved to cache/sesh_20250910_133300/best_model.pth
+2025-09-10 14:19:41,832 - DyckTransformer - INFO - Epoch 16/33, Training Loss: 0.0023, Time: 156.73s
+2025-09-10 14:20:01,854 - DyckTransformer - INFO - For validation data: loss = 0.0004, accuracy = 0.99720000, Time: 20.02s
+2025-09-10 14:20:01,855 - DyckTransformer - INFO - New best model found at epoch 16
+2025-09-10 14:20:01,898 - DyckTransformer - INFO - Best model saved to cache/sesh_20250910_133300/best_model.pth
+2025-09-10 14:22:47,548 - DyckTransformer - INFO - Epoch 17/33, Training Loss: 0.0021, Time: 165.65s
+2025-09-10 14:23:06,204 - DyckTransformer - INFO - For validation data: loss = 0.0038, accuracy = 0.96820000, Time: 18.66s
+2025-09-10 14:25:47,690 - DyckTransformer - INFO - Epoch 18/33, Training Loss: 0.0018, Time: 161.45s
+2025-09-10 14:26:07,237 - DyckTransformer - INFO - For validation data: loss = 0.0005, accuracy = 0.99670000, Time: 19.55s
+2025-09-10 14:28:56,953 - DyckTransformer - INFO - Epoch 19/33, Training Loss: 0.0016, Time: 169.68s
+2025-09-10 14:29:14,989 - DyckTransformer - INFO - For validation data: loss = 0.0044, accuracy = 0.96000000, Time: 18.04s
+2025-09-10 14:31:57,467 - DyckTransformer - INFO - Epoch 20/33, Training Loss: 0.0015, Time: 162.44s
+2025-09-10 14:32:14,842 - DyckTransformer - INFO - For validation data: loss = 0.0002, accuracy = 0.99930000, Time: 17.37s
+2025-09-10 14:32:14,842 - DyckTransformer - INFO - New best model found at epoch 20
+2025-09-10 14:32:14,888 - DyckTransformer - INFO - Best model saved to cache/sesh_20250910_133300/best_model.pth
+2025-09-10 14:34:51,419 - DyckTransformer - INFO - Epoch 21/33, Training Loss: 0.0014, Time: 156.53s
+2025-09-10 14:35:08,824 - DyckTransformer - INFO - For validation data: loss = 0.0005, accuracy = 0.99650000, Time: 17.40s
+2025-09-10 14:37:43,999 - DyckTransformer - INFO - Epoch 22/33, Training Loss: 0.0013, Time: 155.14s
+2025-09-10 14:38:02,209 - DyckTransformer - INFO - For validation data: loss = 0.0006, accuracy = 0.99620000, Time: 18.21s
+2025-09-10 14:40:39,624 - DyckTransformer - INFO - Epoch 23/33, Training Loss: 0.0011, Time: 157.39s
+2025-09-10 14:40:58,749 - DyckTransformer - INFO - For validation data: loss = 0.0004, accuracy = 0.99690000, Time: 19.12s
+2025-09-10 14:43:35,974 - DyckTransformer - INFO - Epoch 24/33, Training Loss: 0.0011, Time: 157.19s
+2025-09-10 14:43:52,795 - DyckTransformer - INFO - For validation data: loss = 0.0001, accuracy = 0.99970000, Time: 16.82s
+2025-09-10 14:43:52,795 - DyckTransformer - INFO - New best model found at epoch 24
+2025-09-10 14:43:52,836 - DyckTransformer - INFO - Best model saved to cache/sesh_20250910_133300/best_model.pth
+2025-09-10 14:46:31,482 - DyckTransformer - INFO - Epoch 25/33, Training Loss: 0.0010, Time: 158.65s
+2025-09-10 14:46:50,739 - DyckTransformer - INFO - For validation data: loss = 0.0005, accuracy = 0.99640000, Time: 19.26s
+2025-09-10 14:49:27,905 - DyckTransformer - INFO - Epoch 26/33, Training Loss: 0.0009, Time: 157.14s
+2025-09-10 14:49:44,902 - DyckTransformer - INFO - For validation data: loss = 0.0000, accuracy = 1.00000000, Time: 17.00s
+2025-09-10 14:49:44,903 - DyckTransformer - INFO - New best model found at epoch 26
+2025-09-10 14:49:44,949 - DyckTransformer - INFO - Best model saved to cache/sesh_20250910_133300/best_model.pth
+2025-09-10 14:52:23,188 - DyckTransformer - INFO - Epoch 27/33, Training Loss: 0.0009, Time: 158.24s
+2025-09-10 14:52:41,911 - DyckTransformer - INFO - For validation data: loss = 0.0001, accuracy = 0.99970000, Time: 18.72s
+2025-09-10 14:55:24,960 - DyckTransformer - INFO - Epoch 28/33, Training Loss: 0.0008, Time: 163.02s
+2025-09-10 14:55:41,953 - DyckTransformer - INFO - For validation data: loss = 0.0030, accuracy = 0.97890000, Time: 16.99s
+2025-09-10 14:58:20,014 - DyckTransformer - INFO - Epoch 29/33, Training Loss: 0.0008, Time: 158.03s
+2025-09-10 14:58:38,200 - DyckTransformer - INFO - For validation data: loss = 0.0000, accuracy = 0.99990000, Time: 18.19s
+2025-09-10 15:01:14,607 - DyckTransformer - INFO - Epoch 30/33, Training Loss: 0.0008, Time: 156.38s
+2025-09-10 15:01:32,815 - DyckTransformer - INFO - For validation data: loss = 0.0002, accuracy = 0.99880000, Time: 18.21s
+2025-09-10 15:04:11,179 - DyckTransformer - INFO - Epoch 31/33, Training Loss: 0.0007, Time: 158.34s
+2025-09-10 15:04:30,230 - DyckTransformer - INFO - For validation data: loss = 0.0000, accuracy = 1.00000000, Time: 19.05s
+2025-09-10 15:07:12,250 - DyckTransformer - INFO - Epoch 32/33, Training Loss: 0.0007, Time: 161.99s
+2025-09-10 15:07:30,561 - DyckTransformer - INFO - For validation data: loss = 0.0003, accuracy = 0.99770000, Time: 18.31s
+2025-09-10 15:10:03,834 - DyckTransformer - INFO - Epoch 33/33, Training Loss: 0.0006, Time: 153.24s
+2025-09-10 15:10:20,247 - DyckTransformer - INFO - For validation data: loss = 0.0001, accuracy = 0.99990000, Time: 16.41s
+2025-09-10 15:10:20,276 - DyckTransformer - INFO - ============ Training Summary ============
+2025-09-10 15:10:20,276 - DyckTransformer - INFO - Training completed in 5836.82 seconds (97.28 minutes)
+2025-09-10 15:10:20,276 - DyckTransformer - INFO - Best validation loss: 0.0000
+2025-09-10 15:10:20,276 - DyckTransformer - INFO - Best validation accuracy: 1.00000000
+2025-09-10 15:10:20,306 - DyckTransformer - INFO - Final training state saved
