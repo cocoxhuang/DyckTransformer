@@ -6,6 +6,7 @@ import numpy as np
 import math
 from torch.nn import functional as F
 from ..data.dataset import decode
+from ..utils.utils import tokens_to_path
 
 def analyze_cross_attention(model, examples, start_idx=0, step=3, att_head=2, figsize=(15, 12), cmap='Blues', show_diagonal=False, num_examples=9):
     """
@@ -457,25 +458,6 @@ def analyze_encoder_attention(model, examples, start_idx=0, step=0, att_head=0, 
     plt.show()
     
     return all_outputs
-
-# Convert tokens to Dyck path coordinates for visualization
-def tokens_to_path(tokens):
-    """Convert tokens to path coordinates for plotting. North step is represented by a 1 and an East step is represented by a 0."""
-    x_coords = [0]
-    y_coords = [0]
-
-    for i, token in enumerate(tokens):
-        if token == 2:  # 0 in Dyck path (right step)
-            y_coords.append(y_coords[-1])
-            x_coords.append(x_coords[-1] + 1)
-        elif token == 3:  # 1 in Dyck path (up step)
-            y_coords.append(y_coords[-1] + 1)
-            x_coords.append(x_coords[-1])
-        else:  # Other tokens (BOS, EOS, etc.)
-            # Skip these tokens entirely - don't add to path
-            continue
-
-    return x_coords, y_coords
 
 def attention_example(model, examples, ex_idx=0, step=10, cross_att_head=0, encoder_att_head=0, decoder_att_head=0, figsize=(16, 12), cmap='Blues'):
     """
