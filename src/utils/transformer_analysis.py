@@ -3,6 +3,9 @@ from sklearn.decomposition import PCA
 from sklearn.metrics.pairwise import cosine_similarity
 import torch
 import numpy as np
+import math
+from torch.nn import functional as F
+from ..data.dataset import decode
 
 def analyze_cross_attention(model, examples, start_idx=0, step=3, att_head=2, figsize=(15, 12), cmap='Blues', show_diagonal=False, num_examples=9):
     """
@@ -881,53 +884,6 @@ def analyze_positional_embeddings_similarity(model, module = "encoder", figsize 
 
     return similarity_matrix
 
-def analyze_positional_embeddings_tsne(model, module = "encoder", perplexity=30, n_iter=1000, figsize=(10,8), fontsize=10):
-    """
-    Analyze and visualize positional embeddings using t-SNE.
-    
-    Args:
-        model: The transformer model
-        module: Which module to analyze ("source" or "target")
-        perplexity: t-SNE perplexity parameter
-        n_iter: Number of iterations for t-SNE optimization
-        figsize: Figure size for the plot
-        fontsize: Font size for annotations
-    
-    Returns:
-        dict: Dictionary containing t-SNE results
-    """
-    
-    # Get positional encoding weights from model
-    if module == "encoder":
-        assert model.src_pos_encoding is not None, "Ensure your model has an encoder."
-        pos_encoding_weights = model.src_pos_encoding.pe.weight.data.cpu().numpy()
-    if module == "decoder":
-        assert model.tgt_pos_encoding is not None, "Ensure your model has a decoder."
-        pos_encoding_weights = model.tgt_pos_encoding.pe.weight.data.cpu().numpy()
-    
-    # Initialize t-SNE
-    tsne = TSNE(n_components=2, perplexity=perplexity, n_iter=n_iter, random_state=42)
-    
-    # Transform positional embeddings to 2D
-    pos_tsne = tsne.fit_transform(pos_encoding_weights)
-    
-    # Create visualization
-    fig, ax = plt.subplots(figsize=figsize)
-    
-    # Plot t-SNE results
-    scatter = ax.scatter(pos_tsne[:, 0], pos_tsne[:, 1], c=range(len(pos_tsne)), cmap='viridis', alpha=0.8, s=50)
-    plt.colorbar(scatter, label='Position Index')
-    ax.set_title(f't-SNE of {module} Positional Embeddings', fontsize=14)
-    ax.set_xlabel('t-SNE Dimension 1', fontsize=fontsize)
-    ax.set_ylabel('t-SNE Dimension 2', fontsize=fontsize)
-    ax.grid(True, alpha=0.3)
-    
-    # Add position labels for small datasets
-    if len(pos_tsne) <= 100:  # Only label if we have a manageable number of positions
-        for i, (x, y) in enumerate(pos_tsne):
-            ax.annotate(f'{i}', (x, y), xytext=(5, 5), textcoords='offset points', 
-                       fontsize=fontsize, ha='left', va='bottom', color='black')
-
 
 # Create Fourier basis functions
 def create_fourier_basis(n_positions, n_components):
@@ -1051,3 +1007,361 @@ def analyze_positional_embeddings_fourier(model, module = "encoder", figsize = (
         "fourier_projections": fourier_projections,
         "reconstruction_errors": reconstruction_errors,
 }
+
+
+def zero_cross_attention_to_token(model, dataset, criterion, token_id, device, n_batches = 16, eval_steps = list(range(1,10))):
+    '''
+    Ablate cross-attention weights for a specific input token by setting them to zero.
+    Args:
+        model: The transformer model
+        dataset: The dataset object with eval_dataloader
+        criterion: the loss function
+        token_id: The token ID to ablate attention to
+        n_batches: Number of batches to evaluate
+        eval_steps: List of generation steps to evaluate accuracy on
+
+    Returns:
+        accuracies: dict with accuracy at each specified step
+        avg_loss: average loss over the examples 
+    '''
+
+    assert model.architecture == "encoder_decoder", "Cross-attention ablation only applies to encoder-decoder models."
+    token_id = torch.tensor(token_id)
+    
+    def modified_cross_attention_forward(self, q, k=None, v=None, mask=None):
+        """Modified cross attention that zeros out attention to specific token"""
+        if k is None and v is None:
+            k = v = q
+        elif v is None:
+            v = k
+            
+        batch_size = q.size(0)
+        seq_len = q.size(1)
+        src_len = k.size(1)
+        
+        # Original attention computation
+        q_proj = self.q_linear(q)
+        k_proj = self.k_linear(k) 
+        v_proj = self.v_linear(v)
+        
+        # Reshape for multi-head attention
+        q_proj = q_proj.view(batch_size, seq_len, self.num_heads, self.head_dim).transpose(1, 2)
+        k_proj = k_proj.view(batch_size, src_len, self.num_heads, self.head_dim).transpose(1, 2)
+        v_proj = v_proj.view(batch_size, src_len, self.num_heads, self.head_dim).transpose(1, 2)
+        
+        # Compute attention scores
+        scores = torch.matmul(q_proj, k_proj.transpose(2, 3)) / math.sqrt(self.head_dim)
+        
+        # Apply original mask if provided
+        if mask is not None:
+            scores = scores.masked_fill(mask, float('-inf'))
+            
+        # Apply causal mask if this is a causal attention
+        if self.is_causal and mask is None:
+            causal_mask = torch.ones_like(scores).triu(diagonal=1).bool()
+            scores = scores.masked_fill(causal_mask, float('-inf'))
+            
+        # Zero out attention to the specific token (token_id)
+        # We need to identify positions where the source tokens equal token_id
+        # This requires access to the source tokens, which we'll store globally
+        if hasattr(self, '_ablation_src_tokens'):
+            src_tokens = self._ablation_src_tokens
+            # Create mask for positions with token_id: [batch, 1, 1, src_len]
+            token_mask = (src_tokens == token_id).unsqueeze(1).unsqueeze(1)
+            # Expand to match attention scores shape: [batch, num_heads, seq_len, src_len]
+            token_mask = token_mask.expand(-1, self.num_heads, seq_len, -1)
+            scores = scores.masked_fill(token_mask, float('-inf'))
+        
+        # Apply softmax
+        attn_weights = F.softmax(scores, dim=-1)
+        self.last_attn_scores = attn_weights.detach()
+        
+        # Apply attention to values
+        attn_output = torch.matmul(self.attn_dropout(attn_weights), v_proj)
+        
+        # Reshape back and final projection
+        attn_output = attn_output.transpose(1, 2).contiguous().view(batch_size, seq_len, self.d_model)
+        output = self.out_linear(attn_output)
+        
+        return output
+    
+    # Store original forward methods
+    original_forwards = {}
+    
+    # Modify cross attention layers based on actual model structure
+    decoder_layers = model.decoder # decoder is a nn.ModuleList of decoder layers
+    if decoder_layers is not None:
+        for i, layer in enumerate(decoder_layers):
+            cross_attn = layer.cross_attn
+            original_forwards[f'decoder_layer_{i}_cross_attn'] = cross_attn.forward
+            cross_attn.forward = modified_cross_attention_forward.__get__(cross_attn, cross_attn.__class__) # bind ablated forward method
+    
+    # Evaluation loop
+    total_correct_by_steps = {step: 0 for step in eval_steps}
+    total_samples = 0
+    total_loss = 0
+    
+    for batch_idx, batch in enumerate(dataset.eval_dataloader):
+        if batch_idx >= n_batches:
+            break
+            
+        inputs, targets = batch
+        inputs, targets = inputs.to(device), targets.to(device)
+        
+        # Store source tokens for the ablation
+        if decoder_layers is not None:
+            for i, layer in enumerate(decoder_layers):
+                cross_attn = layer.cross_attn
+                if cross_attn is not None:
+                    cross_attn._ablation_src_tokens = inputs
+        
+        # Forward pass
+        outputs = model(src=inputs, tgt=targets[:, :-1])
+        loss = criterion(outputs.view(-1, outputs.size(-1)), targets[:, 1:].contiguous().view(-1))
+        
+        # Generate for accuracy
+        generated = model.generate(src=inputs, tgt=torch.full((inputs.size(0), 1), 0).to(device), max_new_tokens=targets.size(1))
+        
+        for step in eval_steps:
+            correct = (generated[:, :targets.size(1)] == targets)[:,:step].all(dim=1).sum()
+            total_correct_by_steps[step] += correct.item()
+        total_samples += inputs.size(0)
+        total_loss += loss.item()
+
+        # Restore original forward methods
+        if decoder_layers is not None:
+            for i, layer in enumerate(decoder_layers):
+                cross_attn = layer.cross_attn
+                key = f'decoder_layer_{i}_cross_attn'
+                cross_attn.forward = original_forwards[key] # restore original forward method
+                delattr(cross_attn, '_ablation_src_tokens') # clean up the attribute
+
+    accuracies = {step: total_correct_by_steps[step] / total_samples for step in eval_steps}
+    avg_loss = total_loss / total_samples
+
+    return accuracies, avg_loss
+
+
+def compute_levels(sequence, dictionary):
+    """
+    Compute the level (number of 1s - number of 0s) at each position in the sequence.
+    
+    Args:
+        sequence: tensor of token ids
+        dictionary: mapping from tokens to symbols
+        
+    Returns:
+        levels: list of levels at each position
+    """
+    levels = []
+    current_level = 0
+    
+    for token_id in sequence:
+        # Convert token id to symbol
+        symbol = dictionary.get(token_id.item(), str(token_id.item()))
+        
+        # Update level based on symbol (assuming '(' increases level, ')' decreases)
+        if symbol == 1:
+            current_level += 1
+        elif symbol == 0:
+            current_level -= 1
+        
+        levels.append(current_level)
+    
+    return levels
+
+
+def extract_encoder_states(model, device, dataloader, dictionary, max_samples=1000):
+    """
+    Extract encoder hidden states and corresponding levels from the dataset.
+    
+    Args:
+        model: the transformer model
+        dataloader: data loader containing input sequences
+        dictionary: token to symbol mapping
+        max_samples: maximum number of samples to process
+        device: computation device (cpu or cuda)
+        
+    Returns:
+        all_states: tensor of shape (total_positions, hidden_dim)
+        all_positions: tensor of position indices
+    """
+    model.eval()
+    all_states = []
+    all_positions = []
+    
+    sample_count = 0
+    
+    with torch.no_grad():
+        for batch_idx, batch in enumerate(dataloader):
+            if sample_count >= max_samples:
+                break
+                
+            inputs, targets = batch
+            inputs = inputs.to(device)
+            
+            # Get encoder states
+            if model.architecture != 'decoder_only':
+                # Forward through encoder only
+                src_emb = model.src_embedding(inputs)
+                src_emb = model.src_pos_encoding(src_emb)
+                
+                # Pass through encoder layers
+                encoder_output = src_emb
+                for layer in model.encoder:
+                    encoder_output = layer(encoder_output)
+                
+                # encoder_output shape: (batch_size, seq_len, hidden_dim)
+                batch_size, seq_len, hidden_dim = encoder_output.shape
+                
+                # Process each sequence in the batch
+                for i in range(batch_size):
+                    if sample_count >= max_samples:
+                        break
+                        
+                    sequence = inputs[i]
+                    states = encoder_output[i]  # (seq_len, hidden_dim)
+                    
+                    # Compute levels for this sequence
+                    levels = compute_levels(sequence, dictionary)
+                    
+                    # Store states, levels, and positions
+                    for pos in range(seq_len):
+                        all_states.append(states[pos])
+                        all_positions.append(pos)
+                    
+                    sample_count += 1
+            else:
+                print("This probing analysis is designed for encoder-decoder models.")
+                return None, None, None
+    
+    # Convert to tensors
+    all_states = torch.stack(all_states)  # (total_positions, hidden_dim)
+    all_positions = torch.tensor(all_positions, dtype=torch.long)  # (total_positions,)
+    
+    return all_states
+
+def extract_levels(model, dataloader, dictionary, device, max_samples=1000):
+    """
+    Extract encoder hidden states and corresponding levels from the dataset.
+    
+    Args:
+        model: the transformer model
+        dataloader: data loader containing input sequences
+        dictionary: token to symbol mapping
+        max_samples: maximum number of samples to process
+        device: computation device (cpu or cuda)
+        
+    Returns:
+        all_levels: tensor of shape (total_positions,)
+    """
+    model.eval()
+    all_states = []
+    all_levels = []
+    all_positions = []
+    
+    sample_count = 0
+    
+    with torch.no_grad():
+        for batch_idx, batch in enumerate(dataloader):
+            if sample_count >= max_samples:
+                break
+                
+            inputs, _ = batch
+            inputs = inputs.to(device)
+            
+            # encoder_output shape: (batch_size, seq_len, hidden_dim)
+            batch_size, seq_len = inputs.shape
+
+            # Process each sequence in the batch
+            for i in range(batch_size):
+                if sample_count >= max_samples:
+                    break
+                    
+                sequence = inputs[i]
+                
+                # Compute levels for this sequence
+                levels = compute_levels(sequence, dictionary)
+                
+                # Store states, levels, and positions
+                for pos in range(seq_len):
+                    all_levels.append(levels[pos])
+                
+                sample_count += 1
+                
+    all_levels = torch.tensor(all_levels, dtype=torch.long)  # (total_positions,)
+
+    return all_levels
+
+def extract_encoder_states_and_levels(model, dataloader, dictionary, device, max_samples=1000):
+    """
+    Extract encoder hidden states and corresponding levels from the dataset.
+    
+    Args:
+        model: the transformer model
+        dataloader: data loader containing input sequences
+        dictionary: token to symbol mapping
+        max_samples: maximum number of samples to process
+        
+    Returns:
+        all_states: tensor of shape (total_positions, hidden_dim)
+        all_levels: tensor of shape (total_positions,)
+        all_positions: tensor of position indices
+    """
+    model.eval()
+    all_states = []
+    all_levels = []
+    all_positions = []
+    
+    sample_count = 0
+    
+    with torch.no_grad():
+        for batch_idx, batch in enumerate(dataloader):
+            if sample_count >= max_samples:
+                break
+                
+            inputs, targets = batch
+            inputs = inputs.to(device)
+            
+            # Get encoder states
+            if model.architecture == 'encoder_decoder':
+                # Forward through encoder only
+                src_emb = model.src_embedding(inputs)
+                src_emb = model.src_pos_encoding(src_emb)
+                
+                # Pass through encoder layers
+                encoder_output = src_emb
+                for layer in model.encoder:
+                    encoder_output = layer(encoder_output)
+                
+                # encoder_output shape: (batch_size, seq_len, hidden_dim)
+                batch_size, seq_len, hidden_dim = encoder_output.shape
+                
+                # Process each sequence in the batch
+                for i in range(batch_size):
+                    if sample_count >= max_samples:
+                        break
+                        
+                    sequence = inputs[i]
+                    states = encoder_output[i]  # (seq_len, hidden_dim)
+                    
+                    # Compute levels for this sequence
+                    levels = compute_levels(sequence, dictionary)
+                    
+                    # Store states, levels, and positions
+                    for pos in range(seq_len):
+                        all_states.append(states[pos])
+                        all_levels.append(levels[pos])
+                        all_positions.append(pos)
+                    
+                    sample_count += 1
+            else:
+                print("This probing analysis is designed for encoder-decoder models.")
+                return None, None, None
+    
+    # Convert to tensors
+    all_states = torch.stack(all_states)  # (total_positions, hidden_dim)
+    all_levels = torch.tensor(all_levels, dtype=torch.long)  # (total_positions,)
+    all_positions = torch.tensor(all_positions, dtype=torch.long)  # (total_positions,)
+    
+    return all_states, all_levels, all_positions

@@ -5,6 +5,8 @@ cache/decoder/
 cache/encoder/
 configs/decoder.yaml
 configs/encoder.yaml
+examples/
+Analysis_backup.ipynb
 
 
 # Python bytecode
