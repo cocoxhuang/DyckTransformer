@@ -4,12 +4,12 @@ def word_to_path(tokens):
     y_coords = [0]
 
     for i, word in enumerate(tokens):
-        if word == 0:  # 0 in Dyck path (right step)
+        if word == '0':  # 0 in Dyck path (right step)
             y_coords.append(y_coords[-1])
             x_coords.append(x_coords[-1] + 1)
-        elif word == 1:  # 1 in Dyck path (up step)
+        elif word == '1':  # 1 in Dyck path (up step)
             y_coords.append(y_coords[-1] + 1)
             x_coords.append(x_coords[-1])
         else:
-            continue
+            continue  # Ignore other tokens
     return x_coords, y_coords

@@ -6,7 +6,7 @@ import numpy as np
 import math
 from torch.nn import functional as F
 from ..data.dataset import decode
-from ..utils.utils import tokens_to_path
+from ..utils.utils import word_to_path
 
 def analyze_cross_attention(model, examples, start_idx=0, step=3, att_head=2, figsize=(15, 12), cmap='Blues', show_diagonal=False, num_examples=9):
     """
@@ -261,9 +261,9 @@ def analyze_cross_attention_all_steps(model, examples, ex_idx=0, att_head=2, cma
     ax = axes_flat[0]
     
     # Plot input, target, and generated paths
-    input_x, input_y = tokens_to_path(inputs.cpu().numpy())
-    target_x, target_y = tokens_to_path(targets.cpu().numpy())
-    gen_x, gen_y = tokens_to_path(generated.cpu().numpy())
+    input_x, input_y = word_to_path(inputs.cpu().numpy())
+    target_x, target_y = word_to_path(targets.cpu().numpy())
+    gen_x, gen_y = word_to_path(generated.cpu().numpy())
     
     ax.plot(input_x, input_y, 'b-', label='Input', linewidth=2, alpha=0.7)
     ax.plot(target_x, target_y, 'g-', label='Target', linewidth=2, alpha=0.7)
@@ -459,7 +459,7 @@ def analyze_encoder_attention(model, examples, start_idx=0, step=0, att_head=0, 
     
     return all_outputs
 
-def attention_example(model, examples, ex_idx=0, step=10, cross_att_head=0, encoder_att_head=0, decoder_att_head=0, figsize=(16, 12), cmap='Blues'):
+def attention_example(model, examples, dataset, ex_idx=0, step=10, cross_att_head=0, encoder_att_head=0, decoder_att_head=0, figsize=(16, 12), cmap='Blues'):
     """
     Comprehensive attention analysis showing 4 visualizations in a 2x2 grid:
     1. Dyck paths (input, target, generated)
@@ -470,6 +470,7 @@ def attention_example(model, examples, ex_idx=0, step=10, cross_att_head=0, enco
     Args:
         model: The transformer model
         examples: Dict with 'inputs' and 'targets'
+        dataset: The dataset object (for decoding)
         ex_idx: Index of the example to analyze
         step: Generation step to analyze for decoder attentions
         cross_att_head: Attention head to visualize for cross-attention
@@ -511,9 +512,12 @@ def attention_example(model, examples, ex_idx=0, step=10, cross_att_head=0, enco
     ax1 = axes[0, 0]
         
     # Plot input, target, and generated paths
-    input_x, input_y = tokens_to_path(inputs.cpu().numpy())
-    target_x, target_y = tokens_to_path(targets.cpu().numpy())
-    gen_x, gen_y = tokens_to_path(generated.cpu().numpy())
+    print(decode(inputs.cpu().numpy(), dataset.dictionary))
+    input_x, input_y = word_to_path(decode(inputs.cpu().numpy(), dataset.dictionary).split())
+    target_x, target_y = word_to_path(decode(targets.cpu().numpy(), dataset.dictionary).split())
+    gen_x, gen_y = word_to_path(decode(generated.cpu().numpy(), dataset.dictionary).split())
+    print("Input path:")
+    print(word_to_path(decode(inputs.cpu().numpy(), dataset.dictionary).split()))
     
     ax1.plot(input_x, input_y, 'b-', label='Input', linewidth=2, alpha=0.7)
     ax1.plot(target_x, target_y, 'g-', label='Target', linewidth=2, alpha=0.7)
