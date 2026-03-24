@@ -41,7 +41,7 @@ DyckTransformer/
 
 **Prerequisites:**
 - Python 3.8+
-- SageMath (for Dyck word generation)
+- SageMath (only for Dyck word generation)
 - CUDA-compatible GPU (optional)
 
 ```bash
@@ -50,22 +50,18 @@ cd DyckTransformer
 pip install -r requirements.txt
 ```
 
-SageMath installation:
+SageMath installation using conda:
 ```bash
-# Ubuntu/Debian
-sudo apt-get install sagemath
-
-# macOS
-brew install sagemath
-
 # conda
-conda install -c conda-forge sage
+conda create -n sage sage
+conda activate sage
 ```
 
 ## Data Generation
 
 Generate and cache a dataset for semilength `n` independently of training:
 ```bash
+conda activate sage
 python dyck_data.py --n 13
 ```
 
