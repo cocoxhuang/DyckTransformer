@@ -47,14 +47,28 @@ DyckTransformer/
 ```bash
 git clone https://github.com/cocoxhuang/DyckTransformer.git
 cd DyckTransformer
+```
+
+### Training environment (Python venv)
+
+```bash
+python -m venv .venv
+# On Linux/macOS:
+source .venv/bin/activate
+# On Windows:
+.venv\Scripts\activate
+
 pip install -r requirements.txt
 ```
 
-SageMath installation using conda:
+### Data generation environment (SageMath via conda)
+
+SageMath must be installed via conda for Dyck word generation:
+
 ```bash
-# conda
-conda create -n sage sage
+conda create -n sage sage python=3.11
 conda activate sage
+pip install -r requirements.txt
 ```
 
 ## Data Generation
