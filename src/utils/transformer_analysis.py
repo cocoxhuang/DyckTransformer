@@ -1,3 +1,9 @@
+'''
+Core utility functions for analyzing transformer models, including 
+attention visualization and embedding analysis used in Analysis.ipynb.
+'''
+
+
 from matplotlib import pyplot as plt
 from sklearn.decomposition import PCA
 from sklearn.metrics.pairwise import cosine_similarity
@@ -512,12 +518,9 @@ def attention_example(model, examples, dataset, ex_idx=0, step=10, cross_att_hea
     ax1 = axes[0, 0]
         
     # Plot input, target, and generated paths
-    print(decode(inputs.cpu().numpy(), dataset.dictionary))
     input_x, input_y = word_to_path(decode(inputs.cpu().numpy(), dataset.dictionary).split())
     target_x, target_y = word_to_path(decode(targets.cpu().numpy(), dataset.dictionary).split())
     gen_x, gen_y = word_to_path(decode(generated.cpu().numpy(), dataset.dictionary).split())
-    print("Input path:")
-    print(word_to_path(decode(inputs.cpu().numpy(), dataset.dictionary).split()))
     
     ax1.plot(input_x, input_y, 'b-', label='Input', linewidth=2, alpha=0.7)
     ax1.plot(target_x, target_y, 'g-', label='Target', linewidth=2, alpha=0.7)

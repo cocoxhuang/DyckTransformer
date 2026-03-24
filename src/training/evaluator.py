@@ -2,13 +2,35 @@ import torch
 import torch.nn.functional as F
 
 class Evaluator:
+    '''Evaluate a transformer model on a dataloader.
+
+    Supports encoder-only, decoder-only, and encoder-decoder architectures.
+    Computes average loss and sequence-level accuracy for the last generated steps.
+    '''
     def __init__(self, model, dataloader, criterion, device):
+        '''Create an Evaluator.
+
+        Args:
+            model: A model with `.architecture` and a forward compatible with the code paths.
+            dataloader: Yields `(inputs, targets)` batches.
+            criterion: Loss function taking `(logits, targets)`.
+            device: Torch device to move batches to.
+        '''
         self.model = model
         self.dataloader = dataloader
         self.criterion = criterion
         self.device = device
 
     def evaluate(self, max_new_tokens):
+        '''Evaluate on the full dataloader.
+
+        Args:
+            max_new_tokens: Number of final target tokens to score for accuracy.
+
+        Returns:
+            tuple[float, float]: `(avg_loss, accuracy)` where accuracy is sequence-level
+            exact match over the last `max_new_tokens` tokens.
+        '''
         self.model.eval()
         total_loss = 0
         total_correct = 0
@@ -49,6 +71,22 @@ class Evaluator:
         return avg_loss, accuracy
 
     def evaluate_by_steps(self, max_new_tokens, eval_steps = list(range(1,10)), n_batches=16):
+        '''Evaluate accuracy as a function of how many steps are matched.
+        Serves a specific focus for model analysis: how well does the model do on the first generated token, 
+        the first 2 tokens, etc.
+
+        For each `step` in `eval_steps`, counts a sample correct if the first `step`
+        predicted tokens (within the last `max_new_tokens` window) exactly match.
+
+        Args:
+            max_new_tokens: Number of final target tokens to generate/compare.
+            eval_steps: Iterable of step counts to evaluate (e.g. 1..9).
+            n_batches: If not None, limit evaluation to the first `n_batches` batches.
+
+        Returns:
+            tuple[dict[int, float], float]: `(accuracies, avg_loss)` where accuracies
+            maps each step to its exact-match accuracy.
+        '''
         self.model.eval()
         total_loss = 0
         total_samples = 0

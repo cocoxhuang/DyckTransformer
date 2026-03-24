@@ -1,3 +1,8 @@
+'''
+Utility functions for logging training progress, saving logs to both console and file, and managing log directories with timestamps.
+'''
+
+
 import logging
 import os
 from datetime import datetime

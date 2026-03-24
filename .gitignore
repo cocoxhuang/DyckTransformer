@@ -7,6 +7,8 @@ configs/decoder.yaml
 configs/encoder.yaml
 examples/
 Analysis_backup.ipynb
+algo_backup.ipynb
+area_dinv_eda.ipynb
 
 
 # Python bytecode

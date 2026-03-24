@@ -1,8 +1,8 @@
 torch>=1.9.0
 numpy>=1.21.0
 matplotlib>=3.4.0
-pyyaml>=5.4.0
-tqdm>=4.62.0
+PyYAML>=5.4.0
 scikit-learn>=1.0.0
-pickle5>=0.0.11
-sagemath>=9.0
+
+# NOTE: `src/data/dyck_generator.py` imports `sage.all`.
+# Install SageMath separately (apt/brew/conda/WSL) as described in README.

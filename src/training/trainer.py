@@ -16,17 +16,20 @@ from .evaluator import Evaluator
 from ..data.dyck_generator import generate_dyck_data
 
 class Trainer:
+    '''Training loop orchestration for DyckTransformer experiments.
+
+    Handles seeding, optimization, periodic evaluation, and checkpointing.
+    '''
     def __init__(self, model, dataset, config, logger, resume_from=None):
-        """
-        Initialize the Trainer.
-        
+        '''Initialize the Trainer.
+
         Args:
-            model: The transformer model to train
-            dataset: The dataset object containing train/eval dataloaders
-            config: Configuration dictionary
-            logger: Logger instance
-            resume_from: Path to training session to resume from (optional)
-        """
+            model: The transformer model to train.
+            dataset: Dataset object containing train/eval dataloaders.
+            config: Configuration dictionary.
+            logger: Logger instance.
+            resume_from: Path to a training session directory to resume from (optional).
+        '''
         self.model = model
         self.dataset = dataset
         self.config = config
@@ -79,7 +82,7 @@ class Trainer:
         self._print_model_info()
     
     def _print_model_info(self):
-        """Print and log model information."""
+        '''Print and log model information and persist the active config.'''
         self.logger.info("============ Model Information ============")
         arch_msg = f"Model is {'decoder only' if self.model.architecture == 'decoder_only' else 'encoder-decoder' if self.model.architecture == 'encoder_decoder' else 'encoder only'}."
         self.logger.info(arch_msg)
@@ -98,7 +101,11 @@ class Trainer:
         self.logger.info(f"Configuration saved to {config_path}")
 
     def _load_checkpoint(self, session_path):
-        """Load training checkpoint from a previous session."""
+        '''Load a training checkpoint from a previous session directory.
+
+        Args:
+            session_path: Directory containing `model.pth` and `training_state.pth`.
+        '''
         try:
             # Load model state
             model_path = os.path.join(session_path, "model.pth")
@@ -127,7 +134,12 @@ class Trainer:
             self.start_epoch = 0
 
     def _save_checkpoint(self, epoch, is_best=False):
-        """Save training checkpoint."""
+        '''Save a training checkpoint (model + training state).
+
+        Args:
+            epoch: Current epoch index (0-based).
+            is_best: If True, also saves a separate best-model snapshot.
+        '''
         try:
             # Save current model state
             model_path = self.logger.get_model_path("model")
@@ -161,6 +173,11 @@ class Trainer:
             self.logger.error(f"Error saving checkpoint: {e}")
 
     def train(self):        
+        '''Run the training loop for `self.num_epochs`.
+
+        Returns:
+            dict: Training summary including loss/accuracy histories and session path.
+        '''
         self.logger.info("============ Start Training ============")
         if self.start_epoch > 0:
             self.logger.info(f"Resuming training from epoch {self.start_epoch}")

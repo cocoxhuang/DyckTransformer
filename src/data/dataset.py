@@ -7,6 +7,14 @@ import os
 
 class Dataset:
     def __init__(self, data, seed = 42, batch_size = 32, decoder_only=False):
+        '''Initialize the dataset wrapper and build train/eval dataloaders.
+
+        Args:
+            data: Dict with torch tensors under keys 'inputs' and 'targets'.
+            seed: Random seed used for deterministic shuffling and transforms.
+            batch_size: Batch size for the created dataloaders.
+            decoder_only: If True, add both BOS and EOS; otherwise add BOS only.
+        '''
         # Set random seeds FIRST for reproducibility
         self.seed = seed
         torch.manual_seed(seed)
@@ -30,6 +38,11 @@ class Dataset:
         self.dictionary = self._create_dictionary()
        
     def _create_dictionary(self):
+        '''Create a token-id-to-symbol dictionary for decoded inspection.
+
+        Returns:
+            dict: Maps token ids (including BOS/EOS and shifted tokens) to labels.
+        '''
         vocab_dict = {
             self.bos_index: 'bos',
             self.eos_index: 'eos'
@@ -46,6 +59,16 @@ class Dataset:
         return vocab_dict
 
     def create_dataloader(self, data):
+        '''Create a DataLoader for the provided input/target tensors.
+
+        Uses a seeded generator so shuffling is deterministic under the same seed.
+
+        Args:
+            data: Dict with 'inputs' and 'targets' torch tensors.
+
+        Returns:
+            torch.utils.data.DataLoader: Shuffled dataloader.
+        '''
         dataset = torch.utils.data.TensorDataset(data['inputs'], data['targets'])
         # Create a generator with fixed seed for deterministic shuffling
         generator = torch.Generator()
@@ -59,6 +82,14 @@ class Dataset:
         return dataloader
 
     def create_train_val_dataloader(self):
+        '''Transform data with BOS/EOS tokens and split into train/eval dataloaders.
+
+        Side effects:
+            Mutates and reorders `self.data['inputs']` and `self.data['targets']`.
+
+        Returns:
+            tuple[DataLoader, DataLoader]: (train_dataloader, eval_dataloader)
+        '''
         self.data['inputs'] = self.data['inputs'] + max(self.bos_index, self.eos_index) + 1
         self.data['targets'] = self.data['targets'] + max(self.bos_index, self.eos_index) + 1
         if self.decoder_only:
@@ -91,9 +122,15 @@ class Dataset:
         return train_dataloader, eval_dataloader
 
 def decode(sequence, dictionary):
-    """
-    Decode a sequence of token IDs into a string using the provided dictionary.
-    """
+    '''Decode a sequence of token IDs into a string using the provided dictionary.
+
+    Args:
+        sequence: Iterable of token ids (0-dim tensors or ints).
+        dictionary: Mapping from token id (int) to a printable symbol.
+
+    Returns:
+        str: Space-separated decoded tokens.
+    '''
     decoded_tokens = []
     for token_id in sequence:
         if token_id.item() in dictionary:

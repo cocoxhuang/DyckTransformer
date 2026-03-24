@@ -4,6 +4,7 @@ import torch.nn.functional as F
 import math
 
 class PositionalEncoding(nn.Module):
+    '''Implements standard learnable positional encoding for transformer models.'''
     def __init__(self, d_model, max_len=5000, is_sinusoidal=False):
         super().__init__()
         self.is_sinusoidal = is_sinusoidal
@@ -26,6 +27,7 @@ class PositionalEncoding(nn.Module):
             return x + self.pe(position_ids).unsqueeze(0)
 
 class MultiHeadAttention(nn.Module):
+    '''Implements standard multi-head attention mechanism.'''
     def __init__(self, srt_dim, d_model, num_heads, dropout, is_causal=False):
         super().__init__()
         assert d_model % num_heads == 0, "d_model must be divisible by num_heads"
@@ -44,7 +46,6 @@ class MultiHeadAttention(nn.Module):
         self.attn_dropout = nn.Dropout(dropout)
         self.last_attn_scores = None
         self.flash = hasattr(torch.nn.functional, 'scaled_dot_product_attention')
-        self.flash = False
 
     def forward(self, q, k=None, v=None, mask=None):
         if k is None and v is None:
@@ -61,24 +62,21 @@ class MultiHeadAttention(nn.Module):
         k = k.view(batch_size, -1, self.num_heads, self.head_dim).transpose(1, 2)
         v = v.view(batch_size, -1, self.num_heads, self.head_dim).transpose(1, 2)
         
-        self.flash = False
-        if self.flash:
-            return ValueError("Flash attention is not working at the moment.")
-        else:
-            scores = torch.matmul(q, k.transpose(2, 3)) / math.sqrt(self.head_dim)
-            if mask is not None:
-                scores = scores.masked_fill(mask, float('-inf'))
-            if self.is_causal and mask is None:
-                causal_mask = torch.ones_like(scores).triu(diagonal=1).bool()
-                scores = scores.masked_fill(causal_mask, float('-inf'))
-            attn = F.softmax(scores, dim=-1)
-            self.last_attn_scores = attn.detach()
-            output = torch.matmul(self.attn_dropout(attn), v)
-        
+        scores = torch.matmul(q, k.transpose(2, 3)) / math.sqrt(self.head_dim)
+        if mask is not None:
+            scores = scores.masked_fill(mask, float('-inf'))
+        if self.is_causal and mask is None:
+            causal_mask = torch.ones_like(scores).triu(diagonal=1).bool()
+            scores = scores.masked_fill(causal_mask, float('-inf'))
+        attn = F.softmax(scores, dim=-1)
+        self.last_attn_scores = attn.detach()
+        output = torch.matmul(self.attn_dropout(attn), v)
+    
         output = output.transpose(1, 2).contiguous().view(batch_size, -1, self.d_model)
         return self.out_linear(output)
 
 class FeedForward(nn.Module):
+    '''Implements the position-wise feedforward network used in transformer blocks.'''
     def __init__(self, d_model, d_ff):
         super().__init__()
         self.linear1 = nn.Linear(d_model, d_ff)
@@ -88,6 +86,10 @@ class FeedForward(nn.Module):
         return self.linear2(F.gelu(self.linear1(x)))
 
 class TransformerBlock(nn.Module):
+    '''
+    Implements a single transformer block, which can be used for both encoder and decoder layers.
+    We implement a post-norm architecture where layer normalization is applied after the residual connections.
+    '''
     def __init__(self, src_dim, d_model, num_heads, d_ff, dropout=0.1, is_decoder=False):
         super().__init__()
         self.self_attn = MultiHeadAttention(src_dim, d_model, num_heads, dropout, is_causal=is_decoder)
@@ -120,6 +122,10 @@ class TransformerBlock(nn.Module):
         return x
 
 class Transformer(nn.Module):
+    '''
+    Implements a standard transformer model that can be configured as encoder-only, decoder-only, or encoder-decoder.
+    This implementation uses a post-norm architecture and supports both learnable and sinusoidal positional encodings.
+    '''
     def __init__(self, src_vocab_size=None, tgt_vocab_size=None, d_model=128, num_heads=4, 
                  d_ff=256, num_encoder_layers=3, num_decoder_layers=3, max_len=128, seed=42, 
                  dropout=0.1, architecture='encoder_decoder', is_sinusoidal=False):
@@ -256,14 +262,19 @@ class Transformer(nn.Module):
         
         return tgt
     
+    # ==========================================
+    # Methods below are for visualization and analysis purposes
+    # ==========================================
+
     def _embedding_weights(self):
-        # returns embedding weights for visualization or analysis
+        '''Returns embedding weights for visualization or analysis.'''
         return {
             'src_embedding': self.src_embedding.weight if hasattr(self, 'src_embedding') else None,
             'tgt_embedding': self.tgt_embedding.weight if hasattr(self, 'tgt_embedding') else None
         }
 
     def _attention_scores(self):
+        '''Returns attention scores for a specific pass for visualization or analysis.'''
         # first do a pass
         # self.forward(src=src, tgt=tgt, src_mask=src_mask, tgt_mask=tgt_mask)
 
@@ -396,7 +407,7 @@ class Transformer(nn.Module):
                     layer.cross_attn.last_attn_scores = None
 
     def _encoder_embeddings(self,src,src_mask=None):
-        # returns encoder embeddings for a specific pass for visualization or analysis
+        '''returns encoder embeddings for a specific pass for visualization or analysis'''
         if self.architecture == 'decoder_only':
             return None
         else:

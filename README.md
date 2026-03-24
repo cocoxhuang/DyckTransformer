@@ -1,33 +1,10 @@
 # DyckTransformer
 
-A PyTorch implementation of a Transformer model for learning Dyck language patterns. This project focuses on training encoder-decoder transformers to understand and generate balanced parentheses sequences (Dyck words) with comprehensive attention mechanism analysis and robust training infrastructure.
+A PyTorch implementation of a Transformer trained to learn the `area_dinv_to_bounce_area` bijection on Dyck words. Given a Dyck word as input, the model predicts its image under this map. The project includes flexible architecture configuration, session-based checkpointing, and attention visualization tools.
 
-## Usage
+## Task
 
-- **Transformer Architecture**: Supports encoder-only, decoder-only, and encoder-decoder configurations
-- **Jupyter Notebook Analysis**: For cross attention and self attention analysis and visualization
-
-## Quick Start
-
-### Basic Training
-Start a new training session:
-```bash
-python train.py
-```
-
-With custom configuration:
-```bash
-python train.py --config configs/custom_config.yaml
-```
-
-### Training Resumption
-Resume training from a previous session:
-```bash
-python train.py --resume cache/sesh_20250806_123456
-```
-
-### Transformer Analysis
-Please see Analysis.ipynb file for example usage.
+The model is trained on all Dyck words of a given semilength `n`. Inputs and targets are token sequences (0/1 steps) encoding lattice paths, generated via SageMath's `DyckWords`. Token ids 0 and 1 are reserved for BOS/EOS; Dyck step values are shifted by +2.
 
 ## Project Structure
 
@@ -35,156 +12,145 @@ Please see Analysis.ipynb file for example usage.
 DyckTransformer/
 ├── src/
 │   ├── model/
-│   │   └── transformer.py          # Transformer architecture implementation
+│   │   └── transformer.py          # Transformer architecture
 │   ├── data/
-│   │   ├── dataset.py              # Dataset handling and preprocessing
-│   │   └── dyck_generator.py       # Dyck words generation with caching
+│   │   ├── dataset.py              # Dataset wrapper and dataloader creation
+│   │   └── dyck_generator.py       # Dyck word generation and caching (requires SageMath)
 │   ├── training/
-│   │   ├── trainer.py              # Training orchestration class with checkpointing
-│   │   └── evaluator.py            # Model evaluation utilities
-│   ├── utils/
-│   │   ├── config.py               # Configuration management
-│   │   └── logger.py               # Logging system with session management
-│   └── config/
-│       └── default_config.py       # Default configuration settings
+│   │   ├── trainer.py              # Training loop, optimizer, checkpointing
+│   │   └── evaluator.py            # Loss and sequence-level accuracy evaluation
+│   └── utils/
+│       ├── config.py               # YAML config loading and saving
+│       ├── logger.py               # Session-based logging
+│       ├── transformer_analysis.py # Attention visualization functions
+│       └── utils.py                # Dyck word lattice path utilities
 ├── configs/
-│   └── default_config.yaml         # YAML configuration file
-├── cache/                           # Cached data and model checkpoints
-│   └── sesh_YYYYMMDD_HHMMSS/       # Timestamped training sessions
-├── examples/
-│   └── resume_training.py          # Example scripts for training resumption
-├── Analysis.ipynb        # Analysis notebook with attention visualization
-├── train.py                        # Main training script with resume support
-├── manage_sessions.py              # Session management utility
-├── requirements.txt                # Python dependencies
-├── .gitignore                      # Git ignore patterns
-└── README.md
+│   └── default_config.yaml         # Default configuration
+├── cache/                          # Training sessions (logs, checkpoints, configs)
+│   └── sesh_YYYYMMDD_HHMMSS/
+├── data/                           # Cached dataset files
+├── Analysis.ipynb                  # Attention and embedding analysis notebook
+├── algo.ipynb                      # Algorithm exploration notebook
+├── area_dinv_eda.ipynb             # Area/dinv EDA notebook
+├── train.py                        # Main training script
+├── dyck_data.py                    # Standalone data generation script
+└── requirements.txt
 ```
 
 ## Installation
 
-### Prerequisites
-- Python 3.8 or higher
-- SageMath (for Dyck words generation)
-- CUDA-compatible GPU (optional, for faster training)
+**Prerequisites:**
+- Python 3.8+
+- SageMath (for Dyck word generation)
+- CUDA-compatible GPU (optional)
 
-### Setup
-1. Clone the repository:
 ```bash
 git clone https://github.com/cocoxhuang/DyckTransformer.git
 cd DyckTransformer
-```
-
-2. Install dependencies:
-```bash
 pip install -r requirements.txt
 ```
 
-3. Install SageMath (if not already installed):
+SageMath installation:
 ```bash
-# On Ubuntu/Debian
+# Ubuntu/Debian
 sudo apt-get install sagemath
 
-# On macOS with Homebrew
+# macOS
 brew install sagemath
 
-# Or use conda
+# conda
 conda install -c conda-forge sage
 ```
 
+## Data Generation
+
+Generate and cache a dataset for semilength `n` independently of training:
+```bash
+python dyck_data.py --n 13
+```
+
+This saves to `data/dyck_data_13.pkl`. Training will also generate and cache data automatically on first run.
+
+## Training
+
+Start training with the default config:
+```bash
+python train.py
+```
+
+With a custom config:
+```bash
+python train.py --config configs/default_config.yaml
+```
+
+Resume a previous session:
+```bash
+python train.py --resume cache/sesh_20250806_123456
+```
+
+Each training session is saved under `cache/sesh_YYYYMMDD_HHMMSS/` and includes the config, logs, and per-epoch model checkpoints.
+
 ## Configuration
 
-The project uses YAML configuration files for easy parameter management. Key configuration sections:
+Edit `configs/default_config.yaml` to control all parameters:
 
 ```yaml
-# Model architecture settings
 model:
-  architecture: "encoder_decoder"
+  architecture: 'encoder_decoder'  # 'encoder_only', 'decoder_only', or 'encoder_decoder'
   d_model: 128
   num_heads: 4
+  d_ff: 256
   num_encoder_layers: 1
   num_decoder_layers: 1
-  dropout: 0.0
-
-# Training parameters
-training:
-  batch_size: 32
-  num_epochs: 150     
-  learning_rate: 0.0001
-  weight_decay: 0.0
-  cache_dir: "cache"
-  seed: 42
-  save_every_epoch: true                # Save model after each epoch
-
-# Data generation settings
-data:
-  n: 13                                 # Dyck words semilength
-  data_path: 'data/dyck_data_13.pkl'   # Dataset cache path
-  force_regenerate: false               # Force data regeneration
-  eval_size: 10000                      # Validation set size
-```
-
-## Configuration
-
-The project uses YAML configuration files for easy parameter management. Key configuration sections:
-
-- **data**: Dataset parameters (n, data_path, cache_dir)
-- **model**: Architecture settings (d_model, nhead, num_layers, etc.)
-- **training**: Training parameters (batch_size, learning_rate, epochs, etc.)
-
-Example configuration:
-```yaml
-data:
-  n: 10
-  data_path: "cache/dyck_data.pkl"
-  cache_dir: "cache"
-
-model:
-  architecture: "encoder_decoder"
-  d_model: 128
-  nhead: 8
-  num_layers: 6
+  dropout: 0
+  is_sinusoidal: false             # false = learnable positional encoding
+  seed: 5
 
 training:
   batch_size: 32
-  num_epochs: 150     
+  num_epochs: 33
   learning_rate: 0.0001
   weight_decay: 0.0
-  cache_dir: "cache"
+  cache_dir: 'cache'
+  seed: 5
+
+data:
+  n: 13                            # Dyck word semilength
+  data_path: 'data/dyck_data_13.pkl'
+  eval_size: 10000
+  force_regenerate: false
   seed: 42
-  save_every_epoch: true                            # Save model after each epoch
 ```
 
-## Analysis Tools
+## Architecture
 
-The project provides comprehensive analysis capabilities through interactive Jupyter notebooks and programmatic functions.
+The `Transformer` class in [src/model/transformer.py](src/model/transformer.py) supports three modes set by `architecture`:
 
-### **Interactive Analysis Functions**
+- `encoder_decoder`: Standard encoder-decoder with cross-attention (default)
+- `encoder_only`: Encoder stack with a linear output head
+- `decoder_only`: Causal decoder stack; input and target are concatenated
 
-#### Cross-Attention Analysis
-```python
-# Analyze multiple examples in a grid layout
-outputs = analyze_cross_attention(
-    model, examples, 
-    start_idx=0,        # Starting example index
-    step=15,            # Generation step to analyze  
-    att_head=2,         # Attention head to visualize
-    num_examples=9,     # Number of examples (3x3 grid)
-    show_diagonal=False # Optional diagonal reference line
-)
-```
+All architectures use post-norm (LayerNorm after residual), multi-head scaled dot-product attention, and GELU feedforward blocks. Positional encoding is learnable by default; sinusoidal is available via `is_sinusoidal: true`.
 
-#### Self-Attention Analysis  
-```python
-# Analyze individual example self-attention patterns
-outputs = analyze_self_attention(
-    model, examples,
-    ex_idx=10,          # Example index
-    step=21,            # Generation step
-    att_head=1,         # Attention head
-    cmap='Blues'        # Color scheme
-)
-```
+Generation supports greedy decoding (`deterministic=True`) and sampling with temperature and top-k.
 
-### Initial Embedding Analysis
-See Analysis.ipynb
+## Evaluation
+
+The `Evaluator` computes:
+- **Loss**: cross-entropy over the target sequence
+- **Accuracy**: sequence-level exact match over the generated tokens
+
+## Analysis
+
+[Analysis.ipynb](Analysis.ipynb) provides interactive analysis using functions from `src/utils/transformer_analysis.py`:
+
+| Function | Description |
+|---|---|
+| `analyze_cross_attention` | Cross-attention heatmaps for multiple examples at a given generation step |
+| `analyze_decoder_attention` | Decoder self-attention heatmaps for multiple examples |
+| `analyze_encoder_attention` | Encoder self-attention heatmaps for multiple examples |
+| `analyze_cross_attention_all_steps` | Cross-attention across all generation steps for one example, with Dyck path plots |
+
+All functions accept `att_head`, `step`, `num_examples`, `cmap`, and `show_diagonal` parameters and return the collected attention tensors.
+
+Embedding weights are accessible via `model._embedding_weights()`. The `word_to_path` utility converts token sequences to (x, y) lattice path coordinates for plotting.

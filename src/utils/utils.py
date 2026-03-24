@@ -1,5 +1,18 @@
 def word_to_path(tokens):
-    """Convert Dyckword sequence to path coordinates for plotting. North step is represented by a 1 and an East step is represented by a 0."""
+    '''Convert a Dyck word (0/1 steps) into lattice path coordinates.
+
+    Interprets tokens as steps on a grid:
+    - `'0'`: East/right step (x + 1)
+    - `'1'`: North/up step (y + 1)
+
+    Args:
+        tokens: Iterable of step tokens (typically strings `'0'` and `'1'`).
+            Any other token is ignored.
+
+    Returns:
+        tuple[list[int], list[int]]: `(x_coords, y_coords)` starting at (0, 0),
+        suitable for plotting a polyline of the path.
+    '''
     x_coords = [0]
     y_coords = [0]
 

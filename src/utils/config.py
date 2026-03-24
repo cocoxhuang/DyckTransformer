@@ -1,3 +1,7 @@
+'''
+Utility functions for loading and saving configuration files in YAML format.
+'''
+
 from pathlib import Path
 import yaml
 

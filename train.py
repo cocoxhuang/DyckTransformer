@@ -1,3 +1,18 @@
+'''Main file for training DyckTransformer models.
+
+Loads a YAML config, generates or optionally caches Dyck data, builds the model,
+and runs the training loop.
+
+Usage:
+    python train.py
+    python train.py --config configs/default_config.yaml
+    python train.py --config configs/default_config.yaml --resume cache/<session_dir>
+
+Args:
+    --config: Path to a YAML configuration file.
+    --resume: Optional path to a previous training session to resume from.
+'''
+
 import argparse
 from src.model.transformer import Transformer
 from src.data.dataset import Dataset
@@ -10,6 +25,8 @@ import os
 def main(config_path, resume_from=None):
     config = load_config(config_path)
     
+    # If resuming, set up logger and load previous config
+    # otherwise create new logger
     if resume_from:
         # Load configuration from the resume session
         resume_config_path = os.path.join(resume_from, "config")
@@ -73,7 +90,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Train the Transformer model.")
     parser.add_argument('--config', type=str, default='configs/default_config.yaml', help='Path to the configuration file.')
     parser.add_argument('--resume', type=str, default=None, help='Path to training session to resume from (e.g., cache/sesh_20250804_052923)')
-    # parser.add_argument('--list-sessions', action='store_true', help='List all available training sessions')
     args = parser.parse_args()
 
     main(args.config, resume_from=args.resume)
