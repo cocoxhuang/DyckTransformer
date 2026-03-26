@@ -554,7 +554,7 @@ def attention_example(model, examples, dataset, ex_idx=0, step=10, cross_att_hea
         crs_att = torch.zeros((1, 1))  # Default empty attention matrix
 
     im2 = ax2.imshow(crs_att.cpu().numpy(), cmap=cmap, aspect='auto')
-    ax2.set_title(f'Cross-Attention (Step {step}, Head {cross_att_head})', fontsize=12)
+    ax2.set_title(f'Cross-Attention (Step {step + 1}, Head {cross_att_head})', fontsize=12)
     ax2.set_xlabel('Input Position')
     ax2.set_ylabel('Generated Position')
     
@@ -579,7 +579,7 @@ def attention_example(model, examples, dataset, ex_idx=0, step=10, cross_att_hea
         enc_att = torch.zeros((1, 1))  # Default empty attention matrix  
 
     im3 = ax3.imshow(enc_att.cpu().numpy(), cmap=cmap, aspect='auto')
-    ax3.set_title(f'Encoder Self-Attention (Head {encoder_att_head})', fontsize=12)
+    ax3.set_title(f'Encoder Self-Attention (Step {step + 1}, Head {encoder_att_head})', fontsize=12)
     ax3.set_xlabel('Key Position')
     ax3.set_ylabel('Query Position')
     
@@ -604,7 +604,7 @@ def attention_example(model, examples, dataset, ex_idx=0, step=10, cross_att_hea
         dec_self_att = torch.zeros((1, 1))  # Default empty attention matrix
 
     im4 = ax4.imshow(dec_self_att.cpu().numpy(), cmap=cmap, aspect='auto')
-    ax4.set_title(f'Decoder Self-Attention (Step {step}, Head {decoder_att_head})', fontsize=12)
+    ax4.set_title(f'Decoder Self-Attention (Step {step + 1}, Head {decoder_att_head})', fontsize=12)
     ax4.set_xlabel('Key Position')
     ax4.set_ylabel('Query Position')
     
